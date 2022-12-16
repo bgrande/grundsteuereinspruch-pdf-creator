@@ -10,7 +10,7 @@ use structopt::StructOpt;
 
 fn html2pdf(url: String) -> Result<(), Error> {
     let options= Vec::from([
-        "input".to_string(), "https://bgrande.de".to_string(),
+        "input".to_string(), url,
         "output".to_string(), "test.pdf".to_string(),
    ]);
     let opt = CliOptions::from_iter(options);
@@ -27,6 +27,6 @@ async fn hello_world() -> &'static str {
 async fn axum() -> shuttle_service::ShuttleAxum {
     let router = Router::new().route("/hello", get(hello_world));
     let sync_wrapper = SyncWrapper::new(router);
-
+    html2pdf("https://bgrande.de".to_string());
     Ok(sync_wrapper)
 }
