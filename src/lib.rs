@@ -1,6 +1,8 @@
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::env;
 use std::ffi::OsString;
+use std::ops::Deref;
 use std::str::FromStr;
 
 use axum::{routing::get, Router};
@@ -19,14 +21,20 @@ fn html2pdf(url: String) -> Result<(), Error> {
     run(opt)
 }
 
+fn to_result(from_2pdf: Result<(), Error>) -> &'static str {
+    return match from_2pdf.unwrap() {
+        () => "done",
+        _ => "sth. went wrong"
+    }
+}
+
 async fn hello_world() -> &'static str {
-    "Hello, world!"
+    to_result(html2pdf("https://bgrande.de".to_string()))
 }
 
 #[shuttle_service::main]
 async fn axum() -> shuttle_service::ShuttleAxum {
     let router = Router::new().route("/hello", get(hello_world));
     let sync_wrapper = SyncWrapper::new(router);
-    html2pdf("https://bgrande.de".to_string());
     Ok(sync_wrapper)
 }
