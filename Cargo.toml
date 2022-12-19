@@ -7,9 +7,15 @@ publish = false
 [lib]
 
 [dependencies]
-shuttle-service = { version = "0.7.2", features = ["web-axum"] }
+shuttle-service = { version = "0.8", features = ["web-axum"] }
+#anyhow = "1.0.68"
 axum = "0.5"
-sync_wrapper = "0.1.1"
+sync_wrapper = "0.1"
 tokio = "1.20"
-html2pdf = "0.5.1"
+html2pdf = "0.5"
+rand = "0.8.5"
+ring = "0.16.20"
+serde = { version = "1.0", features = ["derive"] }
 structopt = "0.3"
+tera = "1.17"
+#tower_governor = "0.0.3"
