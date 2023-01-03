@@ -5,15 +5,14 @@ use std::borrow::Borrow;
 use anyhow::Result as AnyResult;
 use axum::{routing::get, routing::post, Router, extract, Form};
 use axum::extract::Path;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, ParseResult, Utc};
 use sync_wrapper::SyncWrapper;
-use html2pdf::{run, CliOptions, Error};
+use html2pdf::{run, CliOptions, Error as H2PError};
 
 use rand::{Rng, RngCore};
 use ring::digest;
 use ring::digest::{Digest, SHA256, Context as RingContext};
 use serde::{Deserialize, Serialize};
-use serde_json::Result;
 
 use structopt::lazy_static::lazy_static;
 use structopt::StructOpt;
@@ -63,7 +62,7 @@ lazy_static! {
     };
 }
 
-fn html2pdf(path: String) -> std::result::Result<(), Error> {
+fn html2pdf(path: String) -> std::result::Result<(), H2PError> {
     let options= Vec::from([
         "input", path.as_str()
    ]);
@@ -74,7 +73,7 @@ fn html2pdf(path: String) -> std::result::Result<(), Error> {
 }
 
 fn to_result(from_2pdf: ()) -> &'static str {
-    return match from_2pdf.unwrap() {
+    return match from_2pdf {
         () => "done"
     }
 }
@@ -245,10 +244,15 @@ fn create_path(creator_id: AnyResult<Digest>) -> AnyResult<String> {
 }
 
 fn is_valid_payload(payload: &QuestionResult) -> bool {
-    let sent = DateTime::parse_from_rfc3339(payload.created_at.replace("Z", "+00:00").as_str());
-    let now = Utc::now();
+    let sent = NaiveDateTime::parse_from_str(payload.created_at.replace("Z", "+00:00").as_str(), "%Y-%m-%dT%H:%M:%S%z");
+    let sent_date_time = match sent {
+        Ok(date_time) => date_time.timestamp(),
+        Err(_) => return false
+    };
+
+    let now = Utc::now().timestamp();
     payload.event_type == "FORM_RESPONSE"
-        && sent <= now && payload.event_id.contains("-")
+        && sent_date_time <= now.to_owned() && payload.event_id.contains("-")
         && payload.data.response_id != ""
         && payload.data.submission_id != ""
         && payload.data.response_id != ""
@@ -582,7 +586,7 @@ async fn create_html(Path(params): Path<HashMap<String, String>>, extract::Json(
 
     // todo log meta
 
-    if meta_start_now.value.parse() == false || meta_no_revocation == false {
+    if meta_start_now.value.parse() == Ok(false) || meta_no_revocation.value.parse() == Ok(false) {
         return "Die Zustimmung zur Ausführung des Vertrags vor Ablauf der Widerrufsfrist und/oder den Verlust des Widerrufsrechts dadurch fehlt."
     }
     if meta_origin_page.value != "/fragebogen.html" || meta_token.value != APP_TOKEN {
@@ -594,7 +598,7 @@ async fn create_html(Path(params): Path<HashMap<String, String>>, extract::Json(
         Ok(path) => path,
         Err(e) => {
             //let error_msg = e.to_string().as_str();
-            return "Etwas lief schief beim Erstellen des Briefs."
+            return "Etwas lief schief beim Erstellen des Briefs (1)."
             // todo add kontakt-link
         }
     };
@@ -606,43 +610,97 @@ async fn create_html(Path(params): Path<HashMap<String, String>>, extract::Json(
 
     let letter_context = match Context::from_serialize(&letter) {
         Ok(context) => context,
-        Err(e) => return e.to_string().as_str()
+        Err(e) =>{
+            // log this: e.to_string().as_str();
+            return "Etwas ging schief beim Erstellen des Briefs (2)."
+        }
     };
 
     let letter_result = match TEMPLATES.render(TEMPLATE_NAME_LETTER, &letter_context) {
         Ok(result) => result,
-        Err(e) => return e.to_string().as_str()
+        Err(e) => {
+            // log this: e.to_string().as_str();
+            return "Etwas ging schief beim Erstellen des Briefs (3)."
+        }
     };
+
+    let html_letter_string = match serde_json::to_string_pretty(&letter_result) {
+        Ok(letter) => letter,
+        _ => return "Etwas ging schief beim Erstellen des Briefs (4)."
+    };
+    
+    fs::write(
+        letter_path,
+        html_letter_string,
+    ).expect("Etwas ging schief beim Erstellen des Briefs (5).");
 
     let invoice_context = match Context::from_serialize(&invoice) {
         Ok(result) => result,
-        Err(e) => return e.to_string().as_str()
+        Err(e) => {
+            // log this: e.to_string().as_str();
+            return "Etwas ging schief beim Erstellen der Rechnung (1)."
+        }
     };
 
     let invoice_result = match TEMPLATES.render(TEMPLATE_NAME_INVOICE, &invoice_context) {
         Ok(result) => result,
-        Err(e) => return e.to_string().as_str()
+        Err(e) => {
+            // log this: e.to_string().as_str();
+            return "Etwas ging schief beim Erstellen der Rechnung (2)."
+        }
     };
+
+    let html_invoice_string = match serde_json::to_string_pretty(&invoice_result) {
+        Ok(invoice) => invoice,
+        _ => return "Etwas ging schief beim Erstellen der Rechnung (3)."
+    };
+
+    fs::write(
+        invoice_path,
+        html_invoice_string,
+    ).expect("Etwas ging schief beim Erstellen der Rechnung (4).");
 
 
     let index_context = match Context::from_serialize(&index) {
         Ok(result) => result,
-        Err(e) => return e.to_string().as_str()
+        Err(e) => {
+            // log this: e.to_string().as_str();
+            return "Etwas ging schief beim Erstellen der Übersicht (1)."
+        }
     };
 
     let index_result = match TEMPLATES.render(TEMPLATE_NAME_INDEX, &index_context) {
         Ok(result) => result,
-        Err(e) => return e.to_string().as_str()
+        Err(e) => {
+            // log this: e.to_string().as_str();
+            return "Etwas ging schief beim Erstellen der Übersicht (2)."
+        }
     };
+
+    let html_index_string = match serde_json::to_string_pretty(&index_result) {
+        Ok(index) => index,
+        _ => return "Etwas ging schief beim Erstellen der Übersicht (3)."
+    };
+
+    fs::write(
+        index_path,
+        html_index_string,
+    ).expect("Etwas ging schief beim Erstellen der Übersicht (4).");
 
     let list_context = match Context::from_serialize(&list) {
         Ok(result) => result,
-        Err(e) => return e.to_string().as_str()
+        Err(e) => {
+            // log this: e.to_string().as_str();
+            return "Etwas ging schief beim Erstellen der Tipps"
+        }
     };
 
     let list_result = match TEMPLATES.render(TEMPLATE_NAME_LIST, &list_context) {
         Ok(result) => result,
-        Err(e) => return e.to_string().as_str()
+        Err(e) => {
+            // log this: e.to_string().as_str();
+            return "Etwas ging schief beim Erstellen der Tipps"
+        }
     };
 
     // todo: create list
@@ -663,6 +721,9 @@ async fn get_html(Path(params): Path<HashMap<String, String>>) -> &'static str {
      // todo return html pages based on params id and type
     let name = params.get("id");
     let page = params.get("type");
+
+
+    ""
 }
 
 async fn get_pdf(Path(params): Path<HashMap<String, String>>) -> &'static str {
