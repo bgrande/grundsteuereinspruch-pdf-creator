@@ -1,16 +1,14 @@
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::{env, fs};
 
 use anyhow::Result as AnyResult;
 use axum::extract::Path;
-use axum::{extract, routing::get, routing::post, Form, Router};
-use chrono::{DateTime, NaiveDateTime, ParseResult, Utc};
+use axum::{extract, routing::get, routing::post, Router};
+use chrono::{NaiveDateTime, Utc};
 use html2pdf::{run, CliOptions, Error as H2PError};
 use sync_wrapper::SyncWrapper;
 
-use rand::{Rng, RngCore};
-use ring::digest;
+use rand::{Rng};
 use ring::digest::{Context as RingContext, Digest, SHA256};
 use serde::{Deserialize, Serialize};
 
@@ -120,7 +118,7 @@ struct QuestionResult {
 }
 
 struct FormFieldMeta {
-    key: String, // ref, originPage, token
+    key: String, /// ref, originPage, token
     value: String,
 }
 
@@ -212,7 +210,7 @@ fn create_random_id() -> AnyResult<Digest> {
     let mut context = RingContext::new(&SHA256);
 
     // add a lot of random numbers
-    for i in 1..250 {
+    for _i in 1..250 {
         let data = random_gen.gen();
         context.update(&[data]);
     }
