@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::{env, fs};
+use std::{env, fmt, fs};
+use std::marker::PhantomData;
 
 use anyhow::Result as AnyResult;
 use axum::extract::Path;
@@ -10,7 +11,8 @@ use sync_wrapper::SyncWrapper;
 
 use rand::{Rng};
 use ring::digest::{Context as RingContext, Digest, SHA256};
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::de::{Error, Visitor};
 
 use structopt::lazy_static::lazy_static;
 use structopt::StructOpt;
@@ -73,6 +75,60 @@ fn to_result(from_2pdf: ()) -> &'static str {
     };
 }
 
+fn parse_value<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
+    where D: Deserializer<'de>
+{
+    struct StringOrVec(PhantomData<Vec<String>>);
+
+    impl<'de> Visitor<'de> for StringOrVec {
+        type Value = Option<Vec<String>>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("string, list of strings or null")
+        }
+
+        fn visit_i8<E>(self, value: i8) -> Result<Self::Value, E> where E: Error {
+            Ok(Some(vec![value.to_owned().to_string()]))
+        }
+
+        fn visit_i16<E>(self, value: i16) -> Result<Self::Value, E> where E: Error {
+            Ok(Some(vec![value.to_owned().to_string()]))
+        }
+
+        fn visit_i32<E>(self, value: i32) -> Result<Self::Value, E> where E: Error {
+            Ok(Some(vec![value.to_owned().to_string()]))
+        }
+
+        fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> where E: Error {
+            Ok(Some(vec![value.to_owned().to_string()]))
+        }
+
+        fn visit_i128<E>(self, value: i128) -> Result<Self::Value, E> where E: Error {
+            Ok(Some(vec![value.to_owned().to_string()]))
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where E: de::Error
+        {
+            Ok(Some(vec![value.to_owned()]))
+        }
+
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+            where E: de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_seq<S>(self, visitor: S) -> Result<Self::Value, S::Error>
+            where S: de::SeqAccess<'de>
+        {
+            Deserialize::deserialize(de::value::SeqAccessDeserializer::new(visitor))
+        }
+    }
+
+    deserializer.deserialize_any(StringOrVec(PhantomData))
+}
+
 // todo check for before processing:
 // const FORM_ID: &str = "wvXAdv"
 // const ORIGIN_PAGE: &str = "/fragebogen.html"
@@ -92,7 +148,9 @@ struct FormField {
     label: String,
     #[serde(rename = "type")]
     form_type: String,
-    value: Vec<String>,
+    #[serde(deserialize_with="parse_value")]
+    value: Option<Vec<String>>,
+    //#[serde(default)]
     options: Option<Vec<FormFieldOption>>,
 }
 
@@ -387,131 +445,153 @@ async fn create_html(
     // todo write the whole payload into JSON?
 
     for field in payload.data.fields {
+        let current_value = match &field.value {
+            Some(option) => option.clone(),
+            _ => vec![]
+        };
+
         // meta_ref, meta_origin are for analytics, origin and token for another API check as well
         if field.key == "question_3xzMoo_81f3e592-de5c-48f2-b459-b494d65dfc65" {
             meta_reference = FormFieldMeta {
                 key: field.key.clone(),
-                value: field.value[0].clone(),
+                value: current_value[0].clone(),
             };
         }
 
         if field.key == "question_3xzMoo_60b2c1c7-03d6-43ae-9266-fd5c29143450" {
             meta_origin_page = FormFieldMeta {
                 key: field.key.clone(),
-                value: field.value[0].clone(),
+                value: current_value[0].clone(),
             };
         }
 
         if field.key == "question_3xzMoo_80705223-756a-4a8d-aa1e-e8b0147a977c" {
             meta_token = FormFieldMeta {
                 key: field.key.clone(),
-                value: field.value[0].clone(),
+                value: current_value[0].clone(),
             };
         }
 
         if field.key == "question_wzdyR1" {
-            letter.first_name = field.value[0].clone();
-            index.first_name = field.value[0].clone();
-            list.first_name = field.value[0].clone();
-            invoice.first_name = field.value[0].clone();
-            email.first_name = field.value[0].clone();
+            let first_name_val = current_value[0].to_owned();
+            
+            letter.first_name = first_name_val.clone();
+            index.first_name = first_name_val.clone();
+            list.first_name = first_name_val.clone();
+            invoice.first_name = first_name_val.clone();
+            email.first_name = first_name_val.clone();
         }
 
         if field.key == "question_m6p5BP" {
-            letter.last_name = field.value[0].clone();
-            index.last_name = field.value[0].clone();
-            list.last_name = field.value[0].clone();
-            invoice.last_name = field.value[0].clone();
-            email.last_name = field.value[0].clone();
+            let last_name_val =current_value[0].to_owned();
+
+            letter.last_name = last_name_val.clone();
+            index.last_name = last_name_val.clone();
+            list.last_name = last_name_val.clone();
+            invoice.last_name = last_name_val.clone();
+            email.last_name = last_name_val.clone();
         }
 
         if field.key == "question_w7p0e6" {
-            letter.street = field.value[0].clone();
-            invoice.street = field.value[0].clone();
+            let street_val = current_value[0].to_owned();
+
+            letter.street = street_val.clone();
+            invoice.street = street_val.clone();
         }
 
         if field.key == "question_mV47y6" {
-            letter.number = field.value[0].clone();
-            invoice.number = field.value[0].clone();
+            let number_val = current_value[0].to_owned();
+            letter.number = number_val.clone();
+            invoice.number = number_val.clone();
         }
 
         if field.key == "question_nPGQyx" {
-            letter.zip = field.value[0].clone();
-            invoice.zip = field.value[0].clone();
+            let zip_val = current_value[0].to_owned();
+
+            letter.zip = zip_val.clone();
+            invoice.zip = zip_val.clone();
         }
 
         if field.key == "question_3ENVY2" {
-            letter.city = field.value[0].clone();
-            invoice.city = field.value[0].clone();
+            let city_val = current_value[0].to_owned();
+
+            letter.city = city_val.clone();
+            invoice.city = city_val.clone();
         }
 
         if field.key == "question_wazO6q" {
-            letter.email = field.value[0].clone();
-            invoice.email = field.value[0].clone();
-            email.email = field.value[0].clone();
+            let email_val = current_value[0].to_owned();
+
+            letter.email = email_val.clone();
+            invoice.email = email_val.clone();
+            email.email = email_val.clone();
         }
 
         if field.key == "question_w2RJMg" {
-            letter.phone = field.value[0].clone();
+            letter.phone = current_value[0].clone();
         }
 
         if field.key == "question_nGQE8p" {
-            letter.sender_names.push(field.value[0].clone());
+            letter.sender_names.push(current_value[0].clone());
         }
 
         if field.key == "question_wAjR0o" {
-            letter.max_sender_count = match field.value[0].clone().parse() {
+            let max_count_val = current_value[0].to_owned();
+
+            letter.max_sender_count = match max_count_val.parse() {
                 Ok(number) => number,
                 Err(_) => 0,
             };
         }
 
+        let sender_name = current_value[0].to_owned();
         if field.key == "question_nGQE8p" {
-            letter.sender_names.push(field.value[0].clone());
+            letter.sender_names.push(sender_name.clone());
         }
         if field.key == "question_mV472J" {
-            letter.sender_names.push(field.value[0].clone());
+            letter.sender_names.push(sender_name.clone());
         }
         if field.key == "question_waaJ7v" {
-            letter.sender_names.push(field.value[0].clone());
+            letter.sender_names.push(sender_name.clone());
         }
         if field.key == "question_m6PD7B" {
-            letter.sender_names.push(field.value[0].clone());
+            letter.sender_names.push(sender_name.clone());
         }
         if field.key == "question_nPrDxB" {
-            letter.sender_names.push(field.value[0].clone());
+            letter.sender_names.push(sender_name.clone());
         }
         if field.key == "question_nrYB42" {
-            letter.sender_names.push(field.value[0].clone());
+            letter.sender_names.push(sender_name.clone());
         }
         if field.key == "question_3jzbRJ" {
-            letter.sender_names.push(field.value[0].clone());
+            letter.sender_names.push(sender_name.clone());
         }
         if field.key == "question_3xzjqv" {
-            letter.sender_names.push(field.value[0].clone());
+            letter.sender_names.push(sender_name.clone());
         }
         if field.key == "question_3NPDjO" {
-            letter.sender_names.push(field.value[0].clone());
+            letter.sender_names.push(sender_name.clone());
         }
 
         if field.key == "question_mJWZ0r" {
-            index.deadline_date = field.value[0].clone();
-            list.deadline_date = field.value[0].clone();
-            email.deadline_date = field.value[0].clone();
+            let deadline_val = current_value[0].to_owned();
+            index.deadline_date = deadline_val.clone();
+            list.deadline_date = deadline_val.clone();
+            email.deadline_date = deadline_val.clone();
         }
 
         if field.key == "question_wgkx4P" {
-            letter.reference_number = field.value[0].clone();
+            letter.reference_number = current_value[0].clone();;
         }
 
         if field.key == "question_nrk9WX" {
-            letter.receiver_office_zip = field.value[0].clone();
+            letter.receiver_office_zip = current_value[0].clone();
             // todo get the receiver address by the zip
         }
 
         // this is Einspruch für Grundsteuerwertbescheid
         if field.key == "question_nWjbDJ_11f917de-4e6a-4290-838e-9d194afd11af"
-            && field.value[0].parse() == Ok(true)
+            && current_value[0].clone().parse() == Ok(true)
         {
             letter
                 .objection_subjects
@@ -519,32 +599,32 @@ async fn create_html(
         }
         // this is Einspruch für Grundsteuermessbescheid
         if field.key == "question_nWjbDJ_73a81f7f-2dbe-4fcd-9573-38f98596049f"
-            && field.value[0].parse() == Ok(true)
+            && current_value[0].clone().parse() == Ok(true)
         {
             letter
                 .objection_subjects
                 .push("Grundsteuermessbescheid".to_string());
         }
         // this is Einspruch für Grundsteuerwertbescheid
-        if field.key == "question_w8Rgel" && !field.value.is_empty() {
+        if field.key == "question_w8Rgel" && !current_value[0].is_empty() {
             letter
                 .objection_subject_start_dates
-                .push(field.value[0].clone());
+                .push(current_value[0].clone());
         }
         // this is Einspruch für Grundsteuermessbescheid
-        if field.key == "question_n0DgP9" && !field.value.is_empty() {
+        if field.key == "question_n0DgP9" && !current_value[0].is_empty() {
             letter
                 .objection_subject_start_dates
-                .push(field.value[0].clone());
+                .push(current_value[0].clone());
         }
 
-        if field.key == "question_mRjGNv" && !field.value.is_empty() {
+        if field.key == "question_mRjGNv" && !current_value[0].is_empty() {
             let options = match field.options {
                 Some(option) => option,
                 None => vec![],
             };
 
-            for value in field.value.clone() {
+            for value in current_value.clone() {
                 match options.iter().find(|&item| item.id == value) {
                     Some(option) => letter.objection_subject_reasons.push(option.text.clone()),
                     None => (),
@@ -552,44 +632,44 @@ async fn create_html(
             }
         }
 
-        if field.key == "question_npkqkZ" && !field.value.is_empty() {
+        if field.key == "question_npkqkZ" && !current_value[0].is_empty() {
             letter
                 .objection_subject_reasons
-                .push(field.value[0].clone());
+                .push(current_value[0].clone());
         }
 
-        if field.key == "question_npkqkZ" && !field.value.is_empty() {
+        if field.key == "question_npkqkZ" && !current_value[0].is_empty() {
             letter
                 .objection_subject_reasons
-                .push(field.value[0].clone());
+                .push(current_value[0].clone());
         }
 
         if field.key == "question_3ENVAL_price" {
-            invoice.payment.price = field.value[0].clone();
+            invoice.payment.price = current_value[0].clone();
         }
         if field.key == "question_3ENVAL_currency" {
-            invoice.payment.currency = field.value[0].clone();
+            invoice.payment.currency = current_value[0].clone();
         }
         if field.key == "question_3ENVAL_name" {
-            invoice.payment.name = field.value[0].clone();
+            invoice.payment.name = current_value[0].clone();
         }
         if field.key == "question_3ENVAL_email" {
-            invoice.payment.email = field.value[0].clone();
+            invoice.payment.email = current_value[0].clone();
         }
         if field.key == "question_3ENVAL_link" {
-            invoice.payment.link = field.value[0].clone();
+            invoice.payment.link = current_value[0].clone();
         }
 
         if field.key == "question_nrYOOl_7200bf88-f16a-4384-9d85-06c7b97b6a4a" {
             meta_start_now = FormFieldMeta {
                 key: field.key.clone(),
-                value: field.value[0].clone(),
+                value: current_value[0].clone(),
             };
         }
         if field.key == "question_w4O77k_ba1c873b-1bbc-4b00-94a4-0cec5d3b3655" {
             meta_no_revocation = FormFieldMeta {
                 key: field.key.clone(),
-                value: field.value[0].clone(),
+                value: current_value[0].clone(),
             };
         }
     }
