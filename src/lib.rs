@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::{env, fmt, fs};
+use std::borrow::Borrow;
 use std::marker::PhantomData;
 
 use anyhow::Result as AnyResult;
@@ -75,42 +76,34 @@ fn to_result(from_2pdf: ()) -> &'static str {
     };
 }
 
-fn parse_value<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum StringVecOrInt {
+    Int(i64),
+    String(String),
+    Vec(Vec<String>),
+}
+
+fn parse_value<'de, D>(deserializer: D) -> Result<Option<StringVecOrInt>, D::Error>
     where D: Deserializer<'de>
 {
-    struct StringOrVec(PhantomData<Vec<String>>);
+    struct StringOrVec(PhantomData<Option<StringVecOrInt>>);
 
     impl<'de> Visitor<'de> for StringOrVec {
-        type Value = Option<Vec<String>>;
+        type Value = Option<StringVecOrInt>;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("string, list of strings or null")
-        }
-
-        fn visit_i8<E>(self, value: i8) -> Result<Self::Value, E> where E: Error {
-            Ok(Some(vec![value.to_owned().to_string()]))
-        }
-
-        fn visit_i16<E>(self, value: i16) -> Result<Self::Value, E> where E: Error {
-            Ok(Some(vec![value.to_owned().to_string()]))
-        }
-
-        fn visit_i32<E>(self, value: i32) -> Result<Self::Value, E> where E: Error {
-            Ok(Some(vec![value.to_owned().to_string()]))
+            formatter.write_str("integer, string, list of strings or null")
         }
 
         fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> where E: Error {
-            Ok(Some(vec![value.to_owned().to_string()]))
-        }
-
-        fn visit_i128<E>(self, value: i128) -> Result<Self::Value, E> where E: Error {
-            Ok(Some(vec![value.to_owned().to_string()]))
+            Ok(Some(StringVecOrInt::Int(value.to_owned() as i64)))
         }
 
         fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
             where E: de::Error
         {
-            Ok(Some(vec![value.to_owned()]))
+            Ok(Some(StringVecOrInt::String(value.to_owned())))
         }
 
         fn visit_unit<E>(self) -> Result<Self::Value, E>
@@ -149,7 +142,7 @@ struct FormField {
     #[serde(rename = "type")]
     form_type: String,
     #[serde(deserialize_with="parse_value")]
-    value: Option<Vec<String>>,
+    value: Option<StringVecOrInt>,
     //#[serde(default)]
     options: Option<Vec<FormFieldOption>>,
 }
@@ -445,35 +438,39 @@ async fn create_html(
     // todo write the whole payload into JSON?
 
     for field in payload.data.fields {
-        let current_value = match &field.value {
-            Some(option) => option.clone(),
-            _ => vec![]
+        let current_value = match field.value.borrow().to_owned() {
+            Some(option) => match option {
+                StringVecOrInt::String(val) => val.clone(),
+                StringVecOrInt::Int(val) => val.to_string().clone(),
+                StringVecOrInt::Vec(val) => "".to_string() // we shouldn't reach this!!
+            },
+            _ => "".to_string()
         };
 
         // meta_ref, meta_origin are for analytics, origin and token for another API check as well
         if field.key == "question_3xzMoo_81f3e592-de5c-48f2-b459-b494d65dfc65" {
             meta_reference = FormFieldMeta {
                 key: field.key.clone(),
-                value: current_value[0].clone(),
+                value: current_value.clone(),
             };
         }
 
         if field.key == "question_3xzMoo_60b2c1c7-03d6-43ae-9266-fd5c29143450" {
             meta_origin_page = FormFieldMeta {
                 key: field.key.clone(),
-                value: current_value[0].clone(),
+                value: current_value.clone(),
             };
         }
 
         if field.key == "question_3xzMoo_80705223-756a-4a8d-aa1e-e8b0147a977c" {
             meta_token = FormFieldMeta {
                 key: field.key.clone(),
-                value: current_value[0].clone(),
+                value: current_value.clone(),
             };
         }
 
         if field.key == "question_wzdyR1" {
-            let first_name_val = current_value[0].to_owned();
+            let first_name_val = current_value.clone();
             
             letter.first_name = first_name_val.clone();
             index.first_name = first_name_val.clone();
@@ -483,7 +480,7 @@ async fn create_html(
         }
 
         if field.key == "question_m6p5BP" {
-            let last_name_val =current_value[0].to_owned();
+            let last_name_val = current_value.clone();
 
             letter.last_name = last_name_val.clone();
             index.last_name = last_name_val.clone();
@@ -493,34 +490,35 @@ async fn create_html(
         }
 
         if field.key == "question_w7p0e6" {
-            let street_val = current_value[0].to_owned();
+            let street_val = current_value.clone();
 
             letter.street = street_val.clone();
             invoice.street = street_val.clone();
         }
 
         if field.key == "question_mV47y6" {
-            let number_val = current_value[0].to_owned();
+            let number_val = current_value.clone();
+
             letter.number = number_val.clone();
             invoice.number = number_val.clone();
         }
 
         if field.key == "question_nPGQyx" {
-            let zip_val = current_value[0].to_owned();
+            let zip_val = current_value.clone();
 
             letter.zip = zip_val.clone();
             invoice.zip = zip_val.clone();
         }
 
         if field.key == "question_3ENVY2" {
-            let city_val = current_value[0].to_owned();
+            let city_val = current_value.clone();
 
             letter.city = city_val.clone();
             invoice.city = city_val.clone();
         }
 
         if field.key == "question_wazO6q" {
-            let email_val = current_value[0].to_owned();
+            let email_val = current_value.clone();
 
             letter.email = email_val.clone();
             invoice.email = email_val.clone();
@@ -528,15 +526,15 @@ async fn create_html(
         }
 
         if field.key == "question_w2RJMg" {
-            letter.phone = current_value[0].clone();
+            letter.phone = current_value.clone();
         }
 
         if field.key == "question_nGQE8p" {
-            letter.sender_names.push(current_value[0].clone());
+            letter.sender_names.push(current_value.clone());
         }
 
         if field.key == "question_wAjR0o" {
-            let max_count_val = current_value[0].to_owned();
+            let max_count_val = current_value.clone();
 
             letter.max_sender_count = match max_count_val.parse() {
                 Ok(number) => number,
@@ -544,7 +542,7 @@ async fn create_html(
             };
         }
 
-        let sender_name = current_value[0].to_owned();
+        let sender_name = current_value.clone();
         if field.key == "question_nGQE8p" {
             letter.sender_names.push(sender_name.clone());
         }
@@ -574,24 +572,28 @@ async fn create_html(
         }
 
         if field.key == "question_mJWZ0r" {
-            let deadline_val = current_value[0].to_owned();
+            let deadline_val = current_value.clone();
+
             index.deadline_date = deadline_val.clone();
             list.deadline_date = deadline_val.clone();
             email.deadline_date = deadline_val.clone();
         }
 
         if field.key == "question_wgkx4P" {
-            letter.reference_number = current_value[0].clone();;
+            letter.reference_number = current_value.clone();
         }
 
         if field.key == "question_nrk9WX" {
-            letter.receiver_office_zip = current_value[0].clone();
+            letter.receiver_office_zip = current_value.clone();
             // todo get the receiver address by the zip
         }
 
+
+        let check_val = current_value.clone();
+
         // this is Einspruch für Grundsteuerwertbescheid
         if field.key == "question_nWjbDJ_11f917de-4e6a-4290-838e-9d194afd11af"
-            && current_value[0].clone().parse() == Ok(true)
+            && check_val.to_owned().parse() == Ok(true)
         {
             letter
                 .objection_subjects
@@ -599,32 +601,41 @@ async fn create_html(
         }
         // this is Einspruch für Grundsteuermessbescheid
         if field.key == "question_nWjbDJ_73a81f7f-2dbe-4fcd-9573-38f98596049f"
-            && current_value[0].clone().parse() == Ok(true)
+            && check_val.to_owned().parse() == Ok(true)
         {
             letter
                 .objection_subjects
                 .push("Grundsteuermessbescheid".to_string());
         }
         // this is Einspruch für Grundsteuerwertbescheid
-        if field.key == "question_w8Rgel" && !current_value[0].is_empty() {
+        if field.key == "question_w8Rgel" && !check_val.to_owned().is_empty() {
             letter
                 .objection_subject_start_dates
-                .push(current_value[0].clone());
+                .push(check_val.clone());
         }
         // this is Einspruch für Grundsteuermessbescheid
-        if field.key == "question_n0DgP9" && !current_value[0].is_empty() {
+        if field.key == "question_n0DgP9" && !check_val.to_owned().is_empty() {
             letter
                 .objection_subject_start_dates
-                .push(current_value[0].clone());
+                .push(check_val.clone());
         }
 
-        if field.key == "question_mRjGNv" && !current_value[0].is_empty() {
+        if field.key == "question_mRjGNv" && !check_val.to_owned().is_empty() {
             let options = match field.options {
                 Some(option) => option,
                 None => vec![],
             };
 
-            for value in current_value.clone() {
+            let vec_val = match field.value.borrow().to_owned() {
+                Some(option) => match option {
+                    StringVecOrInt::String(val) => vec![val.clone()],
+                    StringVecOrInt::Int(val) => vec![val.to_string().clone()],
+                    StringVecOrInt::Vec(val) => val.clone()
+                },
+                _ => vec![],
+            };
+
+            for value in vec_val {
                 match options.iter().find(|&item| item.id == value) {
                     Some(option) => letter.objection_subject_reasons.push(option.text.clone()),
                     None => (),
@@ -632,44 +643,44 @@ async fn create_html(
             }
         }
 
-        if field.key == "question_npkqkZ" && !current_value[0].is_empty() {
+        if field.key == "question_npkqkZ" && !check_val.to_owned().is_empty() {
             letter
                 .objection_subject_reasons
-                .push(current_value[0].clone());
+                .push(check_val.clone());
         }
 
-        if field.key == "question_npkqkZ" && !current_value[0].is_empty() {
+        if field.key == "question_npkqkZ" && !check_val.to_owned().is_empty() {
             letter
                 .objection_subject_reasons
-                .push(current_value[0].clone());
+                .push(check_val.clone());
         }
 
         if field.key == "question_3ENVAL_price" {
-            invoice.payment.price = current_value[0].clone();
+            invoice.payment.price = current_value.clone();
         }
         if field.key == "question_3ENVAL_currency" {
-            invoice.payment.currency = current_value[0].clone();
+            invoice.payment.currency = current_value.clone();
         }
         if field.key == "question_3ENVAL_name" {
-            invoice.payment.name = current_value[0].clone();
+            invoice.payment.name = current_value.clone();
         }
         if field.key == "question_3ENVAL_email" {
-            invoice.payment.email = current_value[0].clone();
+            invoice.payment.email = current_value.clone();
         }
         if field.key == "question_3ENVAL_link" {
-            invoice.payment.link = current_value[0].clone();
+            invoice.payment.link = current_value.clone();
         }
 
         if field.key == "question_nrYOOl_7200bf88-f16a-4384-9d85-06c7b97b6a4a" {
             meta_start_now = FormFieldMeta {
                 key: field.key.clone(),
-                value: current_value[0].clone(),
+                value: current_value.clone(),
             };
         }
         if field.key == "question_w4O77k_ba1c873b-1bbc-4b00-94a4-0cec5d3b3655" {
             meta_no_revocation = FormFieldMeta {
                 key: field.key.clone(),
-                value: current_value[0].clone(),
+                value: current_value.clone(),
             };
         }
     }
