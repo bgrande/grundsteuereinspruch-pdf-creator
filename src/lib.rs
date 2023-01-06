@@ -6,6 +6,8 @@ use std::marker::PhantomData;
 use anyhow::Result as AnyResult;
 use axum::extract::Path;
 use axum::{extract, routing::get, routing::post, Router};
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use chrono::{NaiveDateTime, Utc};
 use html2pdf::{run, CliOptions, Error as H2PError};
 use sync_wrapper::SyncWrapper;
@@ -14,6 +16,8 @@ use rand::{Rng};
 use ring::digest::{Context as RingContext, Digest, SHA256};
 use serde::{de, Deserialize, Deserializer, Serialize};
 use serde::de::{Error, Visitor};
+use serde_json::{json, Value};
+use shuttle_service::tracing::{debug, info};
 
 use structopt::lazy_static::lazy_static;
 use structopt::StructOpt;
@@ -76,50 +80,27 @@ fn to_result(from_2pdf: ()) -> &'static str {
     };
 }
 
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum StringVecOrInt {
-    Int(i64),
-    String(String),
-    Vec(Vec<String>),
-}
-
-fn parse_value<'de, D>(deserializer: D) -> Result<Option<StringVecOrInt>, D::Error>
-    where D: Deserializer<'de>
+fn parse_value<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+    where
+        D: Deserializer<'de>,
 {
-    struct StringOrVec(PhantomData<Option<StringVecOrInt>>);
-
-    impl<'de> Visitor<'de> for StringOrVec {
-        type Value = Option<StringVecOrInt>;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("integer, string, list of strings or null")
-        }
-
-        fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> where E: Error {
-            Ok(Some(StringVecOrInt::Int(value.to_owned() as i64)))
-        }
-
-        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-            where E: de::Error
-        {
-            Ok(Some(StringVecOrInt::String(value.to_owned())))
-        }
-
-        fn visit_unit<E>(self) -> Result<Self::Value, E>
-            where E: de::Error,
-        {
-            Ok(None)
-        }
-
-        fn visit_seq<S>(self, visitor: S) -> Result<Self::Value, S::Error>
-            where S: de::SeqAccess<'de>
-        {
-            Deserialize::deserialize(de::value::SeqAccessDeserializer::new(visitor))
-        }
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum AnyType<'a> {
+        Str(&'a str),
+        U64(u64),
+        Vec(Vec<String>),
+        Bool(bool),
+        None,
     }
 
-    deserializer.deserialize_any(StringOrVec(PhantomData))
+    Ok(match AnyType::deserialize(deserializer)? {
+        AnyType::Str(v) => vec![v.to_string()],
+        AnyType::U64(v) => vec![v.to_string()],
+        AnyType::Vec(v) => v,
+        AnyType::Bool(v) => vec![v.to_string()],
+        AnyType::None => vec!["".to_string()],
+    })
 }
 
 // todo check for before processing:
@@ -127,14 +108,14 @@ fn parse_value<'de, D>(deserializer: D) -> Result<Option<StringVecOrInt>, D::Err
 // const ORIGIN_PAGE: &str = "/fragebogen.html"
 // const TOKEN_ID: &str = "???TOCREATE" -> add as param
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 struct FormFieldOption {
     id: String,
     text: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 struct FormField {
     key: String,
@@ -142,12 +123,12 @@ struct FormField {
     #[serde(rename = "type")]
     form_type: String,
     #[serde(deserialize_with="parse_value")]
-    value: Option<StringVecOrInt>,
+    value: Vec<String>,
     //#[serde(default)]
     options: Option<Vec<FormFieldOption>>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 struct QuestionData {
     response_id: String,
@@ -159,7 +140,7 @@ struct QuestionData {
     fields: Vec<FormField>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 struct QuestionResult {
     event_id: String,
@@ -288,9 +269,14 @@ fn is_valid_payload(payload: &QuestionResult) -> bool {
         payload.created_at.replace("Z", "+00:00").as_str(),
         "%Y-%m-%dT%H:%M:%S%z",
     );
+    info!("sent date: {}", payload.created_at.to_string());
+
     let sent_date_time = match sent {
         Ok(date_time) => date_time.timestamp(),
-        Err(_) => return false,
+        Err(e) => {
+            info!("date conversion issue: {}", e.to_string());
+            return false
+        },
     };
 
     let now = Utc::now().timestamp();
@@ -327,12 +313,14 @@ async fn create_pdf(Path(params): Path<HashMap<String, String>>) -> &'static str
 
 async fn create_html(
     Path(params): Path<HashMap<String, String>>,
-    extract::Json(payload): extract::Json<QuestionResult>,
-) -> &'static str {
+    extract::Json(payload): extract::Json<QuestionResult>
+) -> &'static str  {
+    //info!("{:?}", payload);
+
     let is_payload_valid = is_valid_payload(&payload);
 
     if !is_payload_valid {
-        return "The payload sent is invalid";
+        //return "The payload sent is invalid";
     }
 
     let creator_id = create_random_id();
@@ -438,39 +426,33 @@ async fn create_html(
     // todo write the whole payload into JSON?
 
     for field in payload.data.fields {
-        let current_value = match field.value.borrow().to_owned() {
-            Some(option) => match option {
-                StringVecOrInt::String(val) => val.clone(),
-                StringVecOrInt::Int(val) => val.to_string().clone(),
-                StringVecOrInt::Vec(val) => "".to_string() // we shouldn't reach this!!
-            },
-            _ => "".to_string()
-        };
+        info!("{:?}", &field);
+        let current_value = field.value.to_owned();
 
         // meta_ref, meta_origin are for analytics, origin and token for another API check as well
         if field.key == "question_3xzMoo_81f3e592-de5c-48f2-b459-b494d65dfc65" {
             meta_reference = FormFieldMeta {
                 key: field.key.clone(),
-                value: current_value.clone(),
+                value: current_value[0].clone(),
             };
         }
 
         if field.key == "question_3xzMoo_60b2c1c7-03d6-43ae-9266-fd5c29143450" {
             meta_origin_page = FormFieldMeta {
                 key: field.key.clone(),
-                value: current_value.clone(),
+                value: current_value[0].clone(),
             };
         }
 
         if field.key == "question_3xzMoo_80705223-756a-4a8d-aa1e-e8b0147a977c" {
             meta_token = FormFieldMeta {
                 key: field.key.clone(),
-                value: current_value.clone(),
+                value: current_value[0].clone(),
             };
         }
 
         if field.key == "question_wzdyR1" {
-            let first_name_val = current_value.clone();
+            let first_name_val = current_value[0].clone();
             
             letter.first_name = first_name_val.clone();
             index.first_name = first_name_val.clone();
@@ -480,7 +462,7 @@ async fn create_html(
         }
 
         if field.key == "question_m6p5BP" {
-            let last_name_val = current_value.clone();
+            let last_name_val = current_value[0].clone();
 
             letter.last_name = last_name_val.clone();
             index.last_name = last_name_val.clone();
@@ -490,35 +472,35 @@ async fn create_html(
         }
 
         if field.key == "question_w7p0e6" {
-            let street_val = current_value.clone();
+            let street_val = current_value[0].clone();
 
             letter.street = street_val.clone();
             invoice.street = street_val.clone();
         }
 
         if field.key == "question_mV47y6" {
-            let number_val = current_value.clone();
+            let number_val = current_value[0].clone();
 
             letter.number = number_val.clone();
             invoice.number = number_val.clone();
         }
 
         if field.key == "question_nPGQyx" {
-            let zip_val = current_value.clone();
+            let zip_val = current_value[0].clone();
 
             letter.zip = zip_val.clone();
             invoice.zip = zip_val.clone();
         }
 
         if field.key == "question_3ENVY2" {
-            let city_val = current_value.clone();
+            let city_val = current_value[0].clone();
 
             letter.city = city_val.clone();
             invoice.city = city_val.clone();
         }
 
         if field.key == "question_wazO6q" {
-            let email_val = current_value.clone();
+            let email_val = current_value[0].clone();
 
             letter.email = email_val.clone();
             invoice.email = email_val.clone();
@@ -526,15 +508,15 @@ async fn create_html(
         }
 
         if field.key == "question_w2RJMg" {
-            letter.phone = current_value.clone();
+            letter.phone = current_value[0].clone();
         }
 
         if field.key == "question_nGQE8p" {
-            letter.sender_names.push(current_value.clone());
+            letter.sender_names.push(current_value[0].clone());
         }
 
         if field.key == "question_wAjR0o" {
-            let max_count_val = current_value.clone();
+            let max_count_val = current_value[0].clone();
 
             letter.max_sender_count = match max_count_val.parse() {
                 Ok(number) => number,
@@ -542,7 +524,7 @@ async fn create_html(
             };
         }
 
-        let sender_name = current_value.clone();
+        let sender_name = current_value[0].clone();
         if field.key == "question_nGQE8p" {
             letter.sender_names.push(sender_name.clone());
         }
@@ -572,7 +554,7 @@ async fn create_html(
         }
 
         if field.key == "question_mJWZ0r" {
-            let deadline_val = current_value.clone();
+            let deadline_val = current_value[0].clone();
 
             index.deadline_date = deadline_val.clone();
             list.deadline_date = deadline_val.clone();
@@ -580,16 +562,16 @@ async fn create_html(
         }
 
         if field.key == "question_wgkx4P" {
-            letter.reference_number = current_value.clone();
+            letter.reference_number = current_value[0].clone();
         }
 
         if field.key == "question_nrk9WX" {
-            letter.receiver_office_zip = current_value.clone();
+            letter.receiver_office_zip = current_value[0].clone();
             // todo get the receiver address by the zip
         }
 
 
-        let check_val = current_value.clone();
+        let check_val = current_value[0].clone();
 
         // this is Einspruch für Grundsteuerwertbescheid
         if field.key == "question_nWjbDJ_11f917de-4e6a-4290-838e-9d194afd11af"
@@ -626,14 +608,7 @@ async fn create_html(
                 None => vec![],
             };
 
-            let vec_val = match field.value.borrow().to_owned() {
-                Some(option) => match option {
-                    StringVecOrInt::String(val) => vec![val.clone()],
-                    StringVecOrInt::Int(val) => vec![val.to_string().clone()],
-                    StringVecOrInt::Vec(val) => val.clone()
-                },
-                _ => vec![],
-            };
+            let vec_val = current_value.clone();
 
             for value in vec_val {
                 match options.iter().find(|&item| item.id == value) {
@@ -656,31 +631,31 @@ async fn create_html(
         }
 
         if field.key == "question_3ENVAL_price" {
-            invoice.payment.price = current_value.clone();
+            invoice.payment.price = current_value[0].clone();
         }
         if field.key == "question_3ENVAL_currency" {
-            invoice.payment.currency = current_value.clone();
+            invoice.payment.currency = current_value[0].clone();
         }
         if field.key == "question_3ENVAL_name" {
-            invoice.payment.name = current_value.clone();
+            invoice.payment.name = current_value[0].clone();
         }
         if field.key == "question_3ENVAL_email" {
-            invoice.payment.email = current_value.clone();
+            invoice.payment.email = current_value[0].clone();
         }
         if field.key == "question_3ENVAL_link" {
-            invoice.payment.link = current_value.clone();
+            invoice.payment.link = current_value[0].clone();
         }
 
         if field.key == "question_nrYOOl_7200bf88-f16a-4384-9d85-06c7b97b6a4a" {
             meta_start_now = FormFieldMeta {
                 key: field.key.clone(),
-                value: current_value.clone(),
+                value: current_value[0].clone(),
             };
         }
         if field.key == "question_w4O77k_ba1c873b-1bbc-4b00-94a4-0cec5d3b3655" {
             meta_no_revocation = FormFieldMeta {
                 key: field.key.clone(),
-                value: current_value.clone(),
+                value: current_value[0].clone(),
             };
         }
     }
@@ -688,10 +663,10 @@ async fn create_html(
     // todo log meta
 
     if meta_start_now.value.parse() == Ok(false) || meta_no_revocation.value.parse() == Ok(false) {
-        return "Die Zustimmung zur Ausführung des Vertrags vor Ablauf der Widerrufsfrist und/oder den Verlust des Widerrufsrechts dadurch fehlt.";
+        "Die Zustimmung zur Ausführung des Vertrags vor Ablauf der Widerrufsfrist und/oder den Verlust des Widerrufsrechts dadurch fehlt.".to_string();
     }
     if meta_origin_page.value != "/fragebogen.html" || meta_token.value != APP_TOKEN {
-        return "Der Aufruf war fehlerhaft!";
+        "Der Aufruf war fehlerhaft!".to_string();
     }
 
     let path = match create_path(creator_id) {
@@ -720,6 +695,7 @@ async fn create_html(
         Ok(result) => result,
         Err(e) => {
             // log this: e.to_string().as_str();
+            info!("Brieferstellung, template rendering: {}", e.to_string());
             return "Etwas ging schief beim Erstellen des Briefs (3).";
         }
     };
@@ -729,8 +705,10 @@ async fn create_html(
         _ => return "Etwas ging schief beim Erstellen des Briefs (4).",
     };
 
-    fs::write(letter_path, html_letter_string)
-        .expect("Etwas ging schief beim Erstellen des Briefs (5).");
+    match fs::write(letter_path, html_letter_string) {
+        Ok(_) => {},
+        Err(_) => info!("Etwas ging schief beim Erstellen des Briefs (5).")
+    }
 
     let invoice_context = match Context::from_serialize(&invoice) {
         Ok(result) => result,
@@ -753,8 +731,10 @@ async fn create_html(
         _ => return "Etwas ging schief beim Erstellen der Rechnung (3).",
     };
 
-    fs::write(invoice_path, html_invoice_string)
-        .expect("Etwas ging schief beim Erstellen der Rechnung (4).");
+    match fs::write(invoice_path, html_invoice_string) {
+        Ok(_) => {},
+        Err(_) => info!("Etwas ging schief beim Erstellen der Rechnung (4).")
+    }
 
     let index_context = match Context::from_serialize(&index) {
         Ok(result) => result,
@@ -777,14 +757,16 @@ async fn create_html(
         _ => return "Etwas ging schief beim Erstellen der Übersicht (3).",
     };
 
-    fs::write(index_path, html_index_string)
-        .expect("Etwas ging schief beim Erstellen der Übersicht (4).");
+    match fs::write(index_path, html_index_string) {
+        Ok(_) => {},
+        Err(_) => info!("Etwas ging schief beim Erstellen der Übersicht (4).")
+    }
 
     let list_context = match Context::from_serialize(&list) {
         Ok(result) => result,
         Err(e) => {
             // log this: e.to_string().as_str();
-            return "Etwas ging schief beim Erstellen der Tipps";
+            return "Etwas ging schief beim Erstellen der Tipps (1)";
         }
     };
 
@@ -792,18 +774,26 @@ async fn create_html(
         Ok(result) => result,
         Err(e) => {
             // log this: e.to_string().as_str();
-            return "Etwas ging schief beim Erstellen der Tipps";
+            return "Etwas ging schief beim Erstellen der Tipps (2)";
         }
     };
 
-    // todo: create list
+    let html_list_string = match serde_json::to_string_pretty(&list_result) {
+        Ok(index) => index,
+        _ => return "Etwas ging schief beim Erstellen der Tipps (3).",
+    };
+
+    match fs::write(list_path, html_list_string) {
+        Ok(_) => {},
+        Err(_) => info!("Etwas ging schief beim Erstellen der Tipps (4).")
+    }
+
     // todo  also create a json file with the original data so we can easily adjust and recreate it
     // todo: 3. create html file for html/{file_name}/grundsteuereinspruch.html (tera)
     // todo: 4. create html file for html/{file_name}/rechnung.html             (tera)
     // todo: 5. create html file for html/{file_name}/index.html (contains links to letter + rechnung (pdf): /pdf/get/{file_name})
     // todo: 6. trigger create_pdf for {file_name}
-
-    ""
+    "success"
 }
 
 async fn hello() -> &'static str {
@@ -825,6 +815,12 @@ async fn get_pdf(Path(params): Path<HashMap<String, String>>) -> &'static str {
     let page = params.get("type");
 
     "v1"
+}
+
+async fn test_create_html(
+    axum::extract::Json(data): axum::extract::Json<serde_json::Value>
+) -> axum::extract::Json<Value>  {
+    json!(data).into()
 }
 
 #[shuttle_service::main]
