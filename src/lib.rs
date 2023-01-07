@@ -47,7 +47,6 @@ const FORM_NAME: &str = "Einspruch Grundsteuerbescheid";
 
 lazy_static! {
     pub static ref TEMPLATES: Tera = {
-        let current_dir = String::from(env::current_dir().unwrap().to_str().unwrap());
         let template_path = format!(
             "{}/*.html",
             TEMPLATE_PATH
