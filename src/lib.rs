@@ -8,7 +8,8 @@ use axum::extract::Path;
 use axum::{extract, routing::get, routing::post, Router};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use chrono::{NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::prelude::*;
 use html2pdf::{run, CliOptions, Error as H2PError};
 use sync_wrapper::SyncWrapper;
 
@@ -27,8 +28,8 @@ use tera::{Context, Tera};
 //todo: use tower for rate limiting
 const APP_TOKEN: &str = "846uoisdhgsdgszdog7846934634089hhuaip12xbo";
 
-const TEMPLATE_PATH: &str = "/data/templates";
-const TARGET_PATH: &str = "/data/diedaten";
+const TEMPLATE_PATH: &str = "data/templates";
+const TARGET_PATH: &str = "data/diedaten";
 
 const TEMPLATE_NAME_INDEX: &str = "index.html";
 const TEMPLATE_NAME_LETTER: &str = "letter.html";
@@ -48,19 +49,18 @@ lazy_static! {
     pub static ref TEMPLATES: Tera = {
         let current_dir = String::from(env::current_dir().unwrap().to_str().unwrap());
         let template_path = format!(
-            "{}/{}/*.html",
-            current_dir,
+            "{}/*.html",
             TEMPLATE_PATH
         );
 
         let mut tera = match Tera::new(template_path.as_str()) {
             Ok(t) => t,
             Err(e) => {
-                println!("Parsing error(s): {}", e);
+                info!("Parsing error(s): {}", e);
                 ::std::process::exit(1);
             }
         };
-        tera.autoescape_on(vec![".html"]);
+        tera.autoescape_on(vec![".htm"]);
         //tera.register_filter("do_nothing", do_nothing_filter);
         tera
     };
@@ -80,6 +80,7 @@ fn to_result(from_2pdf: ()) -> &'static str {
     };
 }
 
+// todo should return Option<AnyType> if possible
 fn parse_value<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
     where
         D: Deserializer<'de>,
@@ -91,7 +92,6 @@ fn parse_value<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
         U64(u64),
         Vec(Vec<String>),
         Bool(bool),
-        None,
     }
 
     Ok(match AnyType::deserialize(deserializer)? {
@@ -190,13 +190,14 @@ struct Payment {
 }
 #[derive(Serialize)]
 struct Invoice {
-    sender_name_first: String,
-    sender_name_last: String,
+    sender_first_name: String,
+    sender_last_name: String,
     sender_company_name: String,
     sender_street: String,
     sender_number: String,
     sender_zip: String,
     sender_city: String,
+    sender_email: String,
     first_name: String,
     last_name: String,
     street: String,
@@ -264,19 +265,33 @@ fn create_path(creator_id: AnyResult<Digest>) -> AnyResult<String> {
     Ok(path)
 }
 
-fn is_valid_payload(payload: &QuestionResult) -> bool {
+fn get_date_from_micro(date: &str) -> Option<NaiveDateTime> {
+    info!("sent date: {}", date.to_string());
+    
+    let split = date.split(".");
+    let split_vec = split.collect::<Vec<&str>>();
     let sent = NaiveDateTime::parse_from_str(
-        payload.created_at.replace("Z", "+00:00").as_str(),
+        format!("{}+00:00", split_vec[0]).as_str(),
         "%Y-%m-%dT%H:%M:%S%z",
     );
-    info!("sent date: {}", payload.created_at.to_string());
 
     let sent_date_time = match sent {
-        Ok(date_time) => date_time.timestamp(),
+        Ok(date_time) => date_time,
         Err(e) => {
             info!("date conversion issue: {}", e.to_string());
-            return false
+            return None;
         },
+    };
+
+    Some(sent_date_time)
+}
+
+fn is_valid_payload(payload: &QuestionResult) -> bool {
+    let date = get_date_from_micro(payload.created_at.as_str());
+
+    let sent_date_time = match date {
+        Some(date_time) => date_time.timestamp(),
+        None => return false,
     };
 
     let now = Utc::now().timestamp();
@@ -315,8 +330,6 @@ async fn create_html(
     Path(params): Path<HashMap<String, String>>,
     extract::Json(payload): extract::Json<QuestionResult>
 ) -> &'static str  {
-    //info!("{:?}", payload);
-
     let is_payload_valid = is_valid_payload(&payload);
 
     if !is_payload_valid {
@@ -336,7 +349,7 @@ async fn create_html(
         phone: "".to_string(),
         max_sender_count: 0,
         reference_number: "".to_string(),
-        sender_names_intro: "".to_string(),
+        sender_names_intro: "Eigentümer".to_string(),
         sender_names: vec![],
         receiver_office_name: "".to_string(),
         receiver_office_address: "".to_string(),
@@ -345,19 +358,21 @@ async fn create_html(
         objection_subjects: vec![],
         objection_subject_start_dates: vec![],
         objection_subject_reasons: vec![],
-        date_created: "".to_string(),
+        date_created: Utc::now().format_localized("%e. %B %Y", Locale::de_DE).to_string(),
         subject_text: "".to_string(),
         main_text: "".to_string(),
         additional_greeting_text: "".to_string(),
     };
+    // todo fill sender values (config)
     let mut invoice = Invoice {
-        sender_name_first: "".to_string(),
-        sender_name_last: "".to_string(),
+        sender_first_name: "".to_string(),
+        sender_last_name: "".to_string(),
         sender_company_name: "".to_string(),
         sender_street: "".to_string(),
         sender_number: "".to_string(),
         sender_zip: "".to_string(),
         sender_city: "".to_string(),
+        sender_email: "".to_string(),
         first_name: "".to_string(),
         last_name: "".to_string(),
         street: "".to_string(),
@@ -368,7 +383,7 @@ async fn create_html(
         date: "".to_string(),
         invoice_id: "".to_string(),
         customer_id: "".to_string(),
-        subject_text: "".to_string(),
+        subject_text: "Ihre Rechnung".to_string(),
         payment: Payment {
             price: "".to_string(),
             currency: "".to_string(),
@@ -376,7 +391,7 @@ async fn create_html(
             email: "".to_string(),
             link: "".to_string(),
         },
-        invoice_objects: vec![],
+        invoice_objects: vec!["".to_string()],
     };
     let mut index = Index {
         first_name: "".to_string(),
@@ -426,7 +441,7 @@ async fn create_html(
     // todo write the whole payload into JSON?
 
     for field in payload.data.fields {
-        info!("{:?}", &field);
+        // todo: check if value empty -> skip/continue -> needs None enum to lead to vec[] instead of vec[""]!
         let current_value = field.value.to_owned();
 
         // meta_ref, meta_origin are for analytics, origin and token for another API check as well
@@ -672,21 +687,21 @@ async fn create_html(
     let path = match create_path(creator_id) {
         Ok(path) => path,
         Err(e) => {
-            //let error_msg = e.to_string().as_str();
+            info!("Brieferstellung, creator_id (path) creation: {}", e.to_string());
             return "Etwas lief schief beim Erstellen des Briefs (1).";
-            // todo add kontakt-link
+            // todo add kontakt-link (use error template)
         }
     };
 
     let index_path = format!("{}/{}", path, TEMPLATE_NAME_INDEX);
     let invoice_path = format!("{}/{}", path, TEMPLATE_NAME_INVOICE);
-    let letter_path = format!("{}/{}", path, RESULT_NAME_LETTER);
-    let list_path = format!("{}/{}", path, RESULT_NAME_LIST);
+    let letter_path = format!("{}/{}", path, TEMPLATE_NAME_LETTER);
+    let list_path = format!("{}/{}", path, TEMPLATE_NAME_LIST);
 
     let letter_context = match Context::from_serialize(&letter) {
         Ok(context) => context,
         Err(e) => {
-            // log this: e.to_string().as_str();
+            info!("Brieferstellung, context serializing: {}", e.to_string());
             return "Etwas ging schief beim Erstellen des Briefs (2).";
         }
     };
@@ -694,52 +709,43 @@ async fn create_html(
     let letter_result = match TEMPLATES.render(TEMPLATE_NAME_LETTER, &letter_context) {
         Ok(result) => result,
         Err(e) => {
-            // log this: e.to_string().as_str();
             info!("Brieferstellung, template rendering: {}", e.to_string());
             return "Etwas ging schief beim Erstellen des Briefs (3).";
         }
     };
 
-    let html_letter_string = match serde_json::to_string_pretty(&letter_result) {
-        Ok(letter) => letter,
-        _ => return "Etwas ging schief beim Erstellen des Briefs (4).",
-    };
-
-    match fs::write(letter_path, html_letter_string) {
+    match fs::write(letter_path, letter_result) {
         Ok(_) => {},
-        Err(_) => info!("Etwas ging schief beim Erstellen des Briefs (5).")
+        Err(_) => info!("Etwas ging schief beim Erstellen des Briefs (3).")
     }
 
     let invoice_context = match Context::from_serialize(&invoice) {
         Ok(result) => result,
         Err(e) => {
-            // log this: e.to_string().as_str();
+            info!("Rechnung, context serializing: {}", e.to_string());
             return "Etwas ging schief beim Erstellen der Rechnung (1).";
         }
     };
+    info!("context: {:?}", invoice_context);
+
 
     let invoice_result = match TEMPLATES.render(TEMPLATE_NAME_INVOICE, &invoice_context) {
         Ok(result) => result,
         Err(e) => {
-            // log this: e.to_string().as_str();
+            info!("Rechnung, template rendering: {}", e.to_string());
             return "Etwas ging schief beim Erstellen der Rechnung (2).";
         }
     };
 
-    let html_invoice_string = match serde_json::to_string_pretty(&invoice_result) {
-        Ok(invoice) => invoice,
-        _ => return "Etwas ging schief beim Erstellen der Rechnung (3).",
-    };
-
-    match fs::write(invoice_path, html_invoice_string) {
+    match fs::write(invoice_path, invoice_result) {
         Ok(_) => {},
-        Err(_) => info!("Etwas ging schief beim Erstellen der Rechnung (4).")
+        Err(_) => info!("Etwas ging schief beim Erstellen der Rechnung (3).")
     }
 
     let index_context = match Context::from_serialize(&index) {
         Ok(result) => result,
         Err(e) => {
-            // log this: e.to_string().as_str();
+            info!("Index, context serializing: {}", e.to_string());
             return "Etwas ging schief beim Erstellen der Übersicht (1).";
         }
     };
@@ -747,25 +753,20 @@ async fn create_html(
     let index_result = match TEMPLATES.render(TEMPLATE_NAME_INDEX, &index_context) {
         Ok(result) => result,
         Err(e) => {
-            // log this: e.to_string().as_str();
+            info!("Index, template rendering: {}", e.to_string());
             return "Etwas ging schief beim Erstellen der Übersicht (2).";
         }
     };
 
-    let html_index_string = match serde_json::to_string_pretty(&index_result) {
-        Ok(index) => index,
-        _ => return "Etwas ging schief beim Erstellen der Übersicht (3).",
-    };
-
-    match fs::write(index_path, html_index_string) {
+    match fs::write(index_path, index_result) {
         Ok(_) => {},
-        Err(_) => info!("Etwas ging schief beim Erstellen der Übersicht (4).")
+        Err(_) => info!("Etwas ging schief beim Erstellen der Übersicht (3).")
     }
 
     let list_context = match Context::from_serialize(&list) {
         Ok(result) => result,
         Err(e) => {
-            // log this: e.to_string().as_str();
+            info!("List, context serializing: {}", e.to_string());
             return "Etwas ging schief beim Erstellen der Tipps (1)";
         }
     };
@@ -773,19 +774,14 @@ async fn create_html(
     let list_result = match TEMPLATES.render(TEMPLATE_NAME_LIST, &list_context) {
         Ok(result) => result,
         Err(e) => {
-            // log this: e.to_string().as_str();
+            info!("List, template rendering: {}", e.to_string());
             return "Etwas ging schief beim Erstellen der Tipps (2)";
         }
     };
 
-    let html_list_string = match serde_json::to_string_pretty(&list_result) {
-        Ok(index) => index,
-        _ => return "Etwas ging schief beim Erstellen der Tipps (3).",
-    };
-
-    match fs::write(list_path, html_list_string) {
+    match fs::write(list_path, list_result) {
         Ok(_) => {},
-        Err(_) => info!("Etwas ging schief beim Erstellen der Tipps (4).")
+        Err(_) => info!("Etwas ging schief beim Erstellen der Tipps (3).")
     }
 
     // todo  also create a json file with the original data so we can easily adjust and recreate it

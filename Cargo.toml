@@ -11,7 +11,7 @@ shuttle-service = { version = "0.8", features = ["web-axum"] }
 tracing = "0.1.37"
 anyhow = "1.0.68"
 axum = "0.6"
-chrono = { version = "0.4.23" }
+chrono = { version = "0.4.23", features = ["unstable-locales"] }
 data-encoding = "2.3.3"
 sync_wrapper = "0.1"
 tokio = "1.20"
