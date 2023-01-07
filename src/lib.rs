@@ -79,7 +79,7 @@ fn to_result(from_2pdf: ()) -> &'static str {
     };
 }
 
-// todo should return Option<AnyType> if possible
+// todo should return Option<AnyType> if possible -> needs a bit different handling of the value var in the loop
 fn parse_value<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
     where
         D: Deserializer<'de>,
@@ -91,6 +91,7 @@ fn parse_value<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
         U64(u64),
         Vec(Vec<String>),
         Bool(bool),
+        None,
     }
 
     Ok(match AnyType::deserialize(deserializer)? {
