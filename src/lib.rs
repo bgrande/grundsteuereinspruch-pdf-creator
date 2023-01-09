@@ -30,11 +30,15 @@ const APP_TOKEN: &str = "846uoisdhgsdgszdog7846934634089hhuaip12xbo";
 
 const TEMPLATE_PATH: &str = "data/templates";
 const TARGET_PATH: &str = "data/diedaten";
+const DB_PATH: &str = "data/db";
+
+const SENDER_JSON: &str = "sender.json";
 
 const TEMPLATE_NAME_INDEX: &str = "index.html";
 const TEMPLATE_NAME_LETTER: &str = "letter.html";
 const TEMPLATE_NAME_INVOICE: &str = "invoice.html";
 const TEMPLATE_NAME_LIST: &str = "list.html";
+const TEMPLATE_NAME_ERROR: &str = "error.html";
 
 const RESULT_NAME_JSON: &str = "{}.json";
 
@@ -103,10 +107,17 @@ fn parse_value<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
     })
 }
 
-// todo check for before processing:
-// const FORM_ID: &str = "wvXAdv"
-// const ORIGIN_PAGE: &str = "/fragebogen.html"
-// const TOKEN_ID: &str = "???TOCREATE" -> add as param
+#[derive(Serialize, Deserialize)]
+struct Sender {
+    first_name: String,
+    last_name: String,
+    company_name: String,
+    street: String,
+    number: String,
+    zip: String,
+    city: String,
+    email: String,
+}
 
 #[derive(Deserialize, Debug, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -305,6 +316,16 @@ fn is_valid_payload(payload: &QuestionResult) -> bool {
         && payload.data.form_name == FORM_NAME
 }
 
+fn get_sender_object() -> AnyResult<Sender> {
+    let file_path = format!("{}/{}", DB_PATH, SENDER_JSON);
+
+    let data = fs::read_to_string(file_path);
+    let data_string = data?;
+    let sender: Sender = serde_json::from_str(data_string.as_str())?;
+
+    Ok(sender)
+}
+
 fn create_pdf_by_id(creator_id: String) {}
 
 async fn create_pdf(Path(params): Path<HashMap<String, String>>) -> &'static str {
@@ -330,13 +351,44 @@ async fn create_html(
     Path(params): Path<HashMap<String, String>>,
     extract::Json(payload): extract::Json<QuestionResult>
 ) -> &'static str  {
+    let creator_id = create_random_id();
+    let file_id = match create_path(creator_id) {
+        Ok(id) => id,
+        Err(e) => {
+            info!("Brieferstellung, creator_id (path) creation: {}", e.to_string());
+            return "Etwas lief schief beim Erstellen des Briefs (1).";
+            // todo add kontakt-link (use error template)
+        }
+    };
+
+    let payload_json_path = format!("{}/{}/{}", TEMPLATE_PATH, file_id, format!(RESULT_NAME_JSON, file_id));
+
+    let payload_string = match serde_json::to_string_pretty(&payload) {
+        Ok(index) => index,
+        Err(e) => {
+            info!("error creating json for the payload for file_id {}: {}", file_id, e.to_string());
+        },
+    };
+
+    match fs::write(payload_json_path, payload_string) {
+        Ok(_) => {},
+        Err(_) => info!("error writing json for the payload for file_id {}: {}", file_id, e.to_string()),
+
+    }
+
     let is_payload_valid = is_valid_payload(&payload);
 
     if !is_payload_valid {
         //return "The payload sent is invalid";
     }
 
-    let creator_id = create_random_id();
+    let sender = match get_sender_object() {
+        Ok(object) => object,
+        Err(e) => {
+            info!("error getting the sender data: {}", e.to_string());
+            return "Etwas ging schief bei der Brieferstellung (ß)";
+        }
+    };
 
     let mut letter = Letter {
         first_name: "".to_string(),
@@ -363,16 +415,16 @@ async fn create_html(
         main_text: "".to_string(),
         additional_greeting_text: "".to_string(),
     };
-    // todo fill sender values (config)
+    
     let mut invoice = Invoice {
-        sender_first_name: "".to_string(),
-        sender_last_name: "".to_string(),
-        sender_company_name: "".to_string(),
-        sender_street: "".to_string(),
-        sender_number: "".to_string(),
-        sender_zip: "".to_string(),
-        sender_city: "".to_string(),
-        sender_email: "".to_string(),
+        sender_first_name: sender.first_name,
+        sender_last_name: sender.last_name,
+        sender_company_name: sender.company_name,
+        sender_street: sender.street,
+        sender_number: sender.number,
+        sender_zip: sender.zip,
+        sender_city: sender.city,
+        sender_email: sender.email,
         first_name: "".to_string(),
         last_name: "".to_string(),
         street: "".to_string(),
@@ -381,8 +433,8 @@ async fn create_html(
         city: "".to_string(),
         email: "".to_string(),
         date: "".to_string(),
-        invoice_id: "".to_string(),
-        customer_id: "".to_string(),
+        invoice_id: "".to_string(),   // todo: generate (based on random + customer_id + date)
+        customer_id: "".to_string(),  // todo: generate (based on first_name, last_name)
         subject_text: "Ihre Rechnung".to_string(),
         payment: Payment {
             price: "".to_string(),
@@ -397,7 +449,7 @@ async fn create_html(
         first_name: "".to_string(),
         last_name: "".to_string(),
         date: "".to_string(),
-        file_id: "".to_string(),
+        file_id: file_id.clone(),
         deadline_date: "".to_string(),
     };
     let mut list = List {
@@ -434,6 +486,10 @@ async fn create_html(
         value: "".to_string(),
     };
     let mut meta_no_revocation: FormFieldMeta = FormFieldMeta {
+        key: "".to_string(),
+        value: "".to_string(),
+    };
+    let mut meta_no_warranty: FormFieldMeta = FormFieldMeta {
         key: "".to_string(),
         value: "".to_string(),
     };
@@ -673,30 +729,32 @@ async fn create_html(
                 value: current_value[0].clone(),
             };
         }
+
+        // todo test payload and adjust this:
+        if field.key == "question_w4O77k_ba1c873b-???" {
+            meta_no_warranty = FormFieldMeta {
+                key: field.key.clone(),
+                value: current_value[0].clone(),
+            };
+        }
     }
 
     // todo log meta
 
     if meta_start_now.value.parse() == Ok(false) || meta_no_revocation.value.parse() == Ok(false) {
-        "Die Zustimmung zur Ausführung des Vertrags vor Ablauf der Widerrufsfrist und/oder den Verlust des Widerrufsrechts dadurch fehlt.".to_string();
+        return "Die Zustimmung zur Ausführung des Vertrags vor Ablauf der Widerrufsfrist und/oder den Verlust des Widerrufsrechts dadurch fehlt.";
+    }
+    if meta_no_warranty.value.parse() == Ok(false) {
+        return "Es fehlt die Zustimmung zum Garantieausschluss";
     }
     if meta_origin_page.value != "/fragebogen.html" || meta_token.value != APP_TOKEN {
-        "Der Aufruf war fehlerhaft!".to_string();
+        return "Der Aufruf war fehlerhaft!";
     }
 
-    let path = match create_path(creator_id) {
-        Ok(path) => path,
-        Err(e) => {
-            info!("Brieferstellung, creator_id (path) creation: {}", e.to_string());
-            return "Etwas lief schief beim Erstellen des Briefs (1).";
-            // todo add kontakt-link (use error template)
-        }
-    };
-
-    let index_path = format!("{}/{}", path, TEMPLATE_NAME_INDEX);
-    let invoice_path = format!("{}/{}", path, TEMPLATE_NAME_INVOICE);
-    let letter_path = format!("{}/{}", path, TEMPLATE_NAME_LETTER);
-    let list_path = format!("{}/{}", path, TEMPLATE_NAME_LIST);
+    let index_path = format!("{}/{}", file_id, TEMPLATE_NAME_INDEX);
+    let invoice_path = format!("{}/{}", file_id, TEMPLATE_NAME_INVOICE);
+    let letter_path = format!("{}/{}", file_id, TEMPLATE_NAME_LETTER);
+    let list_path = format!("{}/{}", file_id, TEMPLATE_NAME_LIST);
 
     let letter_context = match Context::from_serialize(&letter) {
         Ok(context) => context,
@@ -785,8 +843,6 @@ async fn create_html(
     }
 
     // todo  also create a json file with the original data so we can easily adjust and recreate it
-    // todo: 3. create html file for html/{file_name}/grundsteuereinspruch.html (tera)
-    // todo: 4. create html file for html/{file_name}/rechnung.html             (tera)
     // todo: 5. create html file for html/{file_name}/index.html (contains links to letter + rechnung (pdf): /pdf/get/{file_name})
     // todo: 6. trigger create_pdf for {file_name}
     "success"
