@@ -40,8 +40,6 @@ const TEMPLATE_NAME_INVOICE: &str = "invoice.html";
 const TEMPLATE_NAME_LIST: &str = "list.html";
 const TEMPLATE_NAME_ERROR: &str = "error.html";
 
-const RESULT_NAME_JSON: &str = "{}.json";
-
 const RESULT_NAME_LETTER: &str = "Grundsteuereinspruch.pdf";
 const RESULT_NAME_INVOICE: &str = "Grundsteuereinspruch-Rechnung.pdf";
 const RESULT_NAME_LIST: &str = "Grundsteuereinspruch-Liste.pdf";
@@ -84,7 +82,7 @@ fn to_result(from_2pdf: ()) -> &'static str {
 }
 
 // todo should return Option<AnyType> if possible -> needs a bit different handling of the value var in the loop
-fn parse_value<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+fn parse_value<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
     where
         D: Deserializer<'de>,
 {
@@ -99,11 +97,11 @@ fn parse_value<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
     }
 
     Ok(match AnyType::deserialize(deserializer)? {
-        AnyType::Str(v) => vec![v.to_string()],
-        AnyType::U64(v) => vec![v.to_string()],
-        AnyType::Vec(v) => v,
-        AnyType::Bool(v) => vec![v.to_string()],
-        AnyType::None => vec!["".to_string()],
+        AnyType::Str(v) => Some(vec![v.to_string()]),
+        AnyType::U64(v) => Some(vec![v.to_string()]),
+        AnyType::Vec(v) => Some(v),
+        AnyType::Bool(v) => Some(vec![v.to_string()]),
+        AnyType::None => None,
     })
 }
 
@@ -134,7 +132,7 @@ struct FormField {
     #[serde(rename = "type")]
     form_type: String,
     #[serde(deserialize_with="parse_value")]
-    value: Vec<String>,
+    value: Option<Vec<String>>,
     //#[serde(default)]
     options: Option<Vec<FormFieldOption>>,
 }
@@ -160,6 +158,7 @@ struct QuestionResult {
     data: QuestionData,
 }
 
+#[derive(Debug)]
 struct FormFieldMeta {
     key: String, /// ref, originPage, token
     value: String,
@@ -361,18 +360,19 @@ async fn create_html(
         }
     };
 
-    let payload_json_path = format!("{}/{}/{}", TEMPLATE_PATH, file_id, format!(RESULT_NAME_JSON, file_id));
+    let payload_json_path = format!("{}/{}/{}", TEMPLATE_PATH, file_id, format!("{}.json", file_id));
 
     let payload_string = match serde_json::to_string_pretty(&payload) {
         Ok(index) => index,
         Err(e) => {
             info!("error creating json for the payload for file_id {}: {}", file_id, e.to_string());
+            "".to_string()
         },
     };
 
     match fs::write(payload_json_path, payload_string) {
         Ok(_) => {},
-        Err(_) => info!("error writing json for the payload for file_id {}: {}", file_id, e.to_string()),
+        Err(e) => info!("error writing json for the payload for file_id {}: {}", file_id, e.to_string()),
 
     }
 
@@ -497,8 +497,12 @@ async fn create_html(
     // todo write the whole payload into JSON?
 
     for field in payload.data.fields {
-        // todo: check if value empty -> skip/continue -> needs None enum to lead to vec[] instead of vec[""]!
-        let current_value = field.value.to_owned();
+        let value = field.value.to_owned();
+
+        let current_value = match value {
+            Some(value) => value,
+            None => continue,
+        };
 
         // meta_ref, meta_origin are for analytics, origin and token for another API check as well
         if field.key == "question_3xzMoo_81f3e592-de5c-48f2-b459-b494d65dfc65" {
@@ -740,6 +744,7 @@ async fn create_html(
     }
 
     // todo log meta
+    //info!()
 
     if meta_start_now.value.parse() == Ok(false) || meta_no_revocation.value.parse() == Ok(false) {
         return "Die Zustimmung zur Ausführung des Vertrags vor Ablauf der Widerrufsfrist und/oder den Verlust des Widerrufsrechts dadurch fehlt.";
