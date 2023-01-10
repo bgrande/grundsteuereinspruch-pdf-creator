@@ -5,8 +5,9 @@ use std::marker::PhantomData;
 
 use anyhow::Result as AnyResult;
 use axum::extract::Path;
-use axum::{extract, routing::get, routing::post, Router};
+use axum::{extract, routing::get, routing::post, Router, Extension};
 use axum::http::StatusCode;
+use axum::http::{Request};
 use axum::response::{IntoResponse, Response};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use chrono::prelude::*;
@@ -24,6 +25,8 @@ use structopt::lazy_static::lazy_static;
 use structopt::StructOpt;
 
 use tera::{Context, Tera};
+//use tower_request_id::{RequestIdLayer, RequestId};
+
 
 //todo: use tower for rate limiting
 const APP_TOKEN: &str = "846uoisdhgsdgszdog7846934634089hhuaip12xbo";
@@ -67,20 +70,6 @@ lazy_static! {
     };
 }
 
-fn html2pdf(path: String) -> std::result::Result<(), H2PError> {
-    let options = Vec::from(["input", path.as_str()]);
-    let opt = CliOptions::from_iter(options);
-
-    // Let's go
-    run(opt)
-}
-
-fn to_result(from_2pdf: ()) -> &'static str {
-    return match from_2pdf {
-        () => "done",
-    };
-}
-
 // todo should return Option<AnyType> if possible -> needs a bit different handling of the value var in the loop
 fn parse_value<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
     where
@@ -118,14 +107,14 @@ struct Sender {
 }
 
 #[derive(Deserialize, Debug, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 struct FormFieldOption {
     id: String,
     text: String,
 }
 
 #[derive(Deserialize, Debug, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 struct FormField {
     key: String,
     label: String,
@@ -133,12 +122,11 @@ struct FormField {
     form_type: String,
     #[serde(deserialize_with="parse_value")]
     value: Option<Vec<String>>,
-    //#[serde(default)]
     options: Option<Vec<FormFieldOption>>,
 }
 
 #[derive(Deserialize, Debug, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 struct QuestionData {
     response_id: String,
     submission_id: String,
@@ -150,7 +138,7 @@ struct QuestionData {
 }
 
 #[derive(Deserialize, Debug, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 struct QuestionResult {
     event_id: String,
     event_type: String,
@@ -248,7 +236,7 @@ struct EMail {
     deadline_date: String,
 }
 
-fn create_random_id() -> AnyResult<Digest> {
+fn create_random_id() -> AnyResult<String> {
     let mut random_gen = rand::thread_rng();
     let mut context = RingContext::new(&SHA256);
 
@@ -258,19 +246,21 @@ fn create_random_id() -> AnyResult<Digest> {
         context.update(&[data]);
     }
 
-    Ok(context.finish())
+    let digest = context.finish();
+    let file_id = data_encoding::HEXLOWER.encode(digest.as_ref());
+
+    Ok(file_id)
 }
 
 fn get_target_path(id: String) -> AnyResult<String> {
-    let current_dir = String::from(env::current_dir()?.to_str().unwrap());
+    let current_dir = String::from(env::current_dir()?.to_str().unwrap()); // todo: get rid of the unwrap here
     let html_path = format!("{}/{}/{}", current_dir, TARGET_PATH, id);
 
     Ok(html_path)
 }
 
-fn create_path(creator_id: AnyResult<Digest>) -> AnyResult<String> {
-    let create_id_folder = data_encoding::HEXLOWER.encode(creator_id?.as_ref());
-    let path = get_target_path(create_id_folder)?;
+fn create_path(file_id: String) -> AnyResult<String> {
+    let path = get_target_path(file_id)?;
     fs::create_dir_all(&path)?;
     Ok(path)
 }
@@ -294,6 +284,20 @@ fn get_date_from_micro(date: &str) -> Option<NaiveDateTime> {
     };
 
     Some(sent_date_time)
+}
+
+fn html2pdf(path: String, result_path: String) -> std::result::Result<(), H2PError> {
+    let options = Vec::from(["input", path.as_str(), "--output", result_path.as_str()]);
+    let opt = CliOptions::from_iter(options);
+
+    // Let's go
+    run(opt)
+}
+
+fn to_result(from_2pdf: ()) -> bool {
+    return match from_2pdf {
+        () => true,
+    };
 }
 
 fn is_valid_payload(payload: &QuestionResult) -> bool {
@@ -325,42 +329,84 @@ fn get_sender_object() -> AnyResult<Sender> {
     Ok(sender)
 }
 
-fn create_pdf_by_id(creator_id: String) {}
-
-async fn create_pdf(Path(params): Path<HashMap<String, String>>) -> &'static str {
-    let name = match params.get("id") {
-        Some(id) => id,
-        _ => "",
-    };
-
-    // todo create pdf by given id
+fn create_pdf_by_id(base_path: String) -> Option<bool> {
     // todo 1. create another random hash? Or use the given one
     // todo 2. get html files by html/{file_name}/{grundsteuereinspruch|invoice}.html -> convert to pdf/{file_name}/{id}.pdf + pdf/{file_name}/{id}_invoice.pdf
     // todo 3. send invoice link to me via email
     // todo 4. send overview link to me via email
-    let html2pdf = match html2pdf(format!("data/templates/{}.html", name)) {
+    let html2pdf_letter = match html2pdf(
+        format!("{}/{}", base_path, TEMPLATE_NAME_LETTER),
+        format!("{}/{}", base_path, RESULT_NAME_LETTER)
+    ) {
         Ok(result) => result,
-        Err(e) => return "sth. went wrong",
+        Err(e) => {
+            info!("sth. went wrong creating the pdf for the letter: {}", e.to_string());
+            return None
+        },
     };
 
-    to_result(html2pdf)
+    let html2pdf_invoice = match html2pdf(
+        format!("{}/{}", base_path, TEMPLATE_NAME_INVOICE),
+        format!("{}/{}", base_path, RESULT_NAME_INVOICE)
+    ) {
+        Ok(result) => result,
+        Err(e) => {
+            info!("sth. went wrong creating the pdf for the invoice: {}", e.to_string());
+            return None
+        },
+    };
+
+    let html2pdf_list = match html2pdf(
+        format!("{}/{}", base_path, TEMPLATE_NAME_LIST),
+        format!("{}/{}", base_path, RESULT_NAME_LIST)
+    ) {
+        Ok(result) => result,
+        Err(e) => {
+            info!("sth. went wrong creating the pdf for the tipps: {}", e.to_string());
+            return None
+        },
+    };
+
+    Some(to_result(html2pdf_letter) && to_result(html2pdf_invoice) && to_result(html2pdf_list))
+}
+
+async fn create_pdf(Path(params): Path<HashMap<String, String>>) -> &'static str {
+    let creator_id = match params.get("id") {
+        Some(id) => id,
+        _ => "",
+    };
+    let create_result = create_pdf_by_id(creator_id.clone().to_string());
+
+    return match create_result {
+        // todo: redirect to index
+        Some(result) => "success",
+        None => "Etwas ging schief beim Erstellen des PDFs",
+    }
 }
 
 async fn create_html(
     Path(params): Path<HashMap<String, String>>,
     extract::Json(payload): extract::Json<QuestionResult>
 ) -> &'static str  {
-    let creator_id = create_random_id();
-    let file_id = match create_path(creator_id) {
+    let file_id = match create_random_id() {
         Ok(id) => id,
-        Err(e) => {
-            info!("Brieferstellung, creator_id (path) creation: {}", e.to_string());
+        Err(e) =>  {
+            info!("Brieferstellung, id creation: {}", e.to_string());
             return "Etwas lief schief beim Erstellen des Briefs (1).";
             // todo add kontakt-link (use error template)
         }
     };
 
-    let payload_json_path = format!("{}/{}/{}", TEMPLATE_PATH, file_id, format!("{}.json", file_id));
+    let base_path = match create_path(file_id.clone()) {
+        Ok(path) => path,
+        Err(e) => {
+            info!("Brieferstellung, path creation: {}", e.to_string());
+            return "Etwas lief schief beim Erstellen des Briefs (1).";
+            // todo add kontakt-link (use error template)
+        }
+    };
+
+    let payload_json_path = format!("{}/{}", base_path, format!("{}.json", file_id));
 
     let payload_string = match serde_json::to_string_pretty(&payload) {
         Ok(index) => index,
@@ -379,6 +425,7 @@ async fn create_html(
     let is_payload_valid = is_valid_payload(&payload);
 
     if !is_payload_valid {
+        // todo activate and test this check
         //return "The payload sent is invalid";
     }
 
@@ -645,7 +692,6 @@ async fn create_html(
             // todo get the receiver address by the zip
         }
 
-
         let check_val = current_value[0].clone();
 
         // this is Einspruch für Grundsteuerwertbescheid
@@ -743,8 +789,10 @@ async fn create_html(
         }
     }
 
-    // todo log meta
-    //info!()
+    info!("start_now: {:?}", &meta_start_now);
+    info!("no_warranty: {:?}", &meta_no_warranty);
+    info!("origin_page: {:?}", &meta_origin_page);
+    info!("token: {:?}", &meta_token);
 
     if meta_start_now.value.parse() == Ok(false) || meta_no_revocation.value.parse() == Ok(false) {
         return "Die Zustimmung zur Ausführung des Vertrags vor Ablauf der Widerrufsfrist und/oder den Verlust des Widerrufsrechts dadurch fehlt.";
@@ -756,10 +804,10 @@ async fn create_html(
         return "Der Aufruf war fehlerhaft!";
     }
 
-    let index_path = format!("{}/{}", file_id, TEMPLATE_NAME_INDEX);
-    let invoice_path = format!("{}/{}", file_id, TEMPLATE_NAME_INVOICE);
-    let letter_path = format!("{}/{}", file_id, TEMPLATE_NAME_LETTER);
-    let list_path = format!("{}/{}", file_id, TEMPLATE_NAME_LIST);
+    let index_path = format!("{}/{}", base_path, TEMPLATE_NAME_INDEX);
+    let invoice_path = format!("{}/{}", base_path, TEMPLATE_NAME_INVOICE);
+    let letter_path = format!("{}/{}", base_path, TEMPLATE_NAME_LETTER);
+    let list_path = format!("{}/{}", base_path, TEMPLATE_NAME_LIST);
 
     let letter_context = match Context::from_serialize(&letter) {
         Ok(context) => context,
@@ -789,8 +837,6 @@ async fn create_html(
             return "Etwas ging schief beim Erstellen der Rechnung (1).";
         }
     };
-    info!("context: {:?}", invoice_context);
-
 
     let invoice_result = match TEMPLATES.render(TEMPLATE_NAME_INVOICE, &invoice_context) {
         Ok(result) => result,
@@ -847,10 +893,11 @@ async fn create_html(
         Err(_) => info!("Etwas ging schief beim Erstellen der Tipps (3).")
     }
 
-    // todo  also create a json file with the original data so we can easily adjust and recreate it
-    // todo: 5. create html file for html/{file_name}/index.html (contains links to letter + rechnung (pdf): /pdf/get/{file_name})
-    // todo: 6. trigger create_pdf for {file_name}
-    "success"
+    return match create_pdf_by_id(base_path) {
+        // todo: redirect to index
+        Some(result) => "success",
+        None => "Etwas ging schief beim Erstellen des PDFs",
+    }
 }
 
 async fn hello() -> &'static str {
@@ -896,7 +943,9 @@ async fn axum() -> shuttle_service::ShuttleAxum {
         .route("/html", post(create_html))
         // todo: rate limit this request (only 10 per minute per IP)
         .route("/pdf/:id/type/:type", get(get_pdf))
-        .route("/page/:id/:type", get(get_html));
+        .route("/page/:id/:type", get(get_html))
+        //.layer(RequestIdLayer)
+        ;
     let sync_wrapper = SyncWrapper::new(router);
 
     Ok(sync_wrapper)
