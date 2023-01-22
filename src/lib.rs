@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::{env, fmt, fs};
 use std::borrow::Borrow;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
 use anyhow::Result as AnyResult;
@@ -9,7 +11,8 @@ use axum::{extract, routing::get, routing::post, Router, Extension};
 use axum::http::StatusCode;
 use axum::http::{Request};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Duration, LocalResult, NaiveDateTime, Utc};
+use chrono::LocalResult::Single;
 use chrono::prelude::*;
 use html2pdf::{run, CliOptions, Error as H2PError};
 use sync_wrapper::SyncWrapper;
@@ -20,6 +23,8 @@ use serde::{de, Deserialize, Deserializer, Serialize};
 use serde::de::{Error, Visitor};
 use serde_json::{json, Value};
 use shuttle_service::tracing::{debug, info};
+use sqlx::sqlite::SqlitePoolOptions;
+use sqlx::{FromRow, Row};
 
 use structopt::lazy_static::lazy_static;
 use structopt::StructOpt;
@@ -92,6 +97,14 @@ fn parse_value<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
         AnyType::Bool(v) => Some(vec![v.to_string()]),
         AnyType::None => None,
     })
+}
+#[derive(FromRow, Debug)]
+struct TaxOffice {
+    name: String,
+    zip: String,
+    city: String,
+    street: String,
+    number: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -174,9 +187,10 @@ struct Letter {
     objection_subject_start_dates: Vec<String>,
     objection_subject_reasons: Vec<String>,
     date_created: String,
+    sent_date: String,
     subject_text: String,
     main_text: String,
-    additional_greeting_text: String,
+    additional_greeting_text: bool,
 }
 #[derive(Serialize)]
 struct Payment {
@@ -216,6 +230,7 @@ struct Index {
     last_name: String,
     date: String,
     file_id: String,
+    sent_date: String,
     deadline_date: String,
 }
 #[derive(Serialize)]
@@ -224,6 +239,7 @@ struct List {
     last_name: String,
     date: String,
     file_id: String,
+    sent_date: String,
     deadline_date: String,
 }
 #[derive(Serialize)]
@@ -233,6 +249,7 @@ struct EMail {
     email: String,
     date: String,
     link: String,
+    sent_date: String,
     deadline_date: String,
 }
 
@@ -327,6 +344,79 @@ fn get_sender_object() -> AnyResult<Sender> {
     let sender: Sender = serde_json::from_str(data_string.as_str())?;
 
     Ok(sender)
+}
+
+fn calculate_hash<T: Hash>(to_hash: &T) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    to_hash.hash(&mut hasher);
+    hasher.finish()
+}
+
+async fn get_tax_office_query(zip: &String, name: &String) -> AnyResult<TaxOffice, anyhow::Error> {
+    let pool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect("sqlite://data/db/tax_offices.db").await?;
+
+    info!("using zip {} and name {}", zip, name);
+    
+    let row = sqlx::query_as::<_, TaxOffice>(
+            "
+SELECT
+    ad.city,
+    ad.street,
+    ad.number,
+    ad.zip,
+    tao.name
+FROM address ad
+JOIN address_to_tax_office atto ON ad.id = atto.address_id
+JOIN tax_office tao ON atto.tax_office_id = tao.id
+WHERE
+    zip = ?
+    AND name = ?
+"
+        )
+        .bind(zip)
+        .bind(name)
+        .fetch_one(&pool).await?;
+
+    Ok(row)
+}
+
+fn get_value_from_option(options: &Option<Vec<FormFieldOption>>, vec_val: Vec<String>) -> Vec<String> {
+    let binding = Vec::new();
+    let options = match options.to_owned() {
+        Some(option) => option,
+        None => &binding,
+    };
+
+    let mut list: Vec<String> = vec![];
+
+    for value in vec_val {
+        match options.iter().find(|&item| item.id == value) {
+            Some(option) => list.push(option.text.clone()),
+            None => (),
+        };
+    }
+
+    return list;
+}
+
+#[derive(Hash)]
+struct EmailHash {
+    email: String,
+}
+
+/*
+fn hash_email(email: &str) -> AnyResult<String> {
+}
+ */
+
+fn get_html_page(name: &str, page: &str) -> AnyResult<String> {
+    let file_path = format!("{}/{}/{}.html", TARGET_PATH, name, page);
+    let data = fs::read_to_string(file_path);
+    let data_string = data?;
+
+    Ok(data_string.clone())
 }
 
 fn create_pdf_by_id(base_path: String) -> Option<bool> {
@@ -437,6 +527,8 @@ async fn create_html(
         }
     };
 
+    let date_now = Utc::now().format_localized("%e. %B %Y", Locale::de_DE).to_string();
+
     let mut letter = Letter {
         first_name: "".to_string(),
         last_name: "".to_string(),
@@ -457,10 +549,11 @@ async fn create_html(
         objection_subjects: vec![],
         objection_subject_start_dates: vec![],
         objection_subject_reasons: vec![],
-        date_created: Utc::now().format_localized("%e. %B %Y", Locale::de_DE).to_string(),
-        subject_text: "".to_string(),
+        date_created: date_now.clone(),
+        sent_date: "".to_string(),
+        subject_text: "Einspruch gegen den Bescheid zur Feststellung des ".to_string(),
         main_text: "".to_string(),
-        additional_greeting_text: "".to_string(),
+        additional_greeting_text: false,
     };
     
     let mut invoice = Invoice {
@@ -479,7 +572,7 @@ async fn create_html(
         zip: "".to_string(),
         city: "".to_string(),
         email: "".to_string(),
-        date: "".to_string(),
+        date: date_now.clone(),
         invoice_id: "".to_string(),   // todo: generate (based on random + customer_id + date)
         customer_id: "".to_string(),  // todo: generate (based on first_name, last_name)
         subject_text: "Ihre Rechnung".to_string(),
@@ -497,6 +590,7 @@ async fn create_html(
         last_name: "".to_string(),
         date: "".to_string(),
         file_id: file_id.clone(),
+        sent_date: "".to_string(),
         deadline_date: "".to_string(),
     };
     let mut list = List {
@@ -504,6 +598,7 @@ async fn create_html(
         last_name: "".to_string(),
         date: "".to_string(),
         file_id: "".to_string(),
+        sent_date: "".to_string(),
         deadline_date: "".to_string(),
     };
     let mut email = EMail {
@@ -512,6 +607,7 @@ async fn create_html(
         email: "".to_string(),
         date: "".to_string(),
         link: "".to_string(),
+        sent_date: "".to_string(),
         deadline_date: "".to_string(),
     };
 
@@ -611,6 +707,7 @@ async fn create_html(
             let zip_val = current_value[0].clone();
 
             letter.zip = zip_val.clone();
+            letter.receiver_office_zip = zip_val.clone();
             invoice.zip = zip_val.clone();
         }
 
@@ -674,22 +771,60 @@ async fn create_html(
         if field.key == "question_3NPDjO" {
             letter.sender_names.push(sender_name.clone());
         }
-
-        if field.key == "question_mJWZ0r" {
-            let deadline_val = current_value[0].clone();
-
-            index.deadline_date = deadline_val.clone();
-            list.deadline_date = deadline_val.clone();
-            email.deadline_date = deadline_val.clone();
+        
+        if letter.sender_names.len() > 1 {
+            letter.additional_greeting_text = true;
         }
 
+        if field.key == "question_mJWZ0r" {
+            let tax_office_sent_date_val = current_value[0].clone();
+            let deadline_date_chrono = NaiveDateTime::parse_from_str(
+                tax_office_sent_date_val.as_str(),
+                "%Y-%m-%d"
+            );
+
+            let deadline_date = match deadline_date_chrono {
+                Ok(date_time) => date_time + Duration::weeks(4),
+                Err(e) => {
+                    info!("date conversion issue: {}", e);
+                    return "Das Datum des Bescheidbriefes ist falsch"
+                },
+            };
+
+            let utc_deadline = Utc.from_local_datetime(&deadline_date);
+            let formatted_deadline = match utc_deadline {
+                Single(date_time) => date_time.format_localized("%e. %B %Y", Locale::de_DE).to_string(),
+                LocalResult::Ambiguous(_, _) => {
+                    info!("date conversion issue: ambiguous");
+                    "".to_string()
+                },
+                LocalResult::None => {
+                    info!("date conversion issue: not existing");
+                    "".to_string()
+                },
+            };
+
+            letter.sent_date = tax_office_sent_date_val.clone();
+
+            index.sent_date = tax_office_sent_date_val.clone();
+            index.deadline_date = formatted_deadline.clone();
+            list.sent_date = tax_office_sent_date_val.clone();
+            list.deadline_date = formatted_deadline.clone();
+            email.sent_date = tax_office_sent_date_val.clone();
+            email.deadline_date = formatted_deadline.clone();
+        }
+
+        // Aktenzeichen
         if field.key == "question_wgkx4P" {
             letter.reference_number = current_value[0].clone();
         }
 
         if field.key == "question_nrk9WX" {
             letter.receiver_office_zip = current_value[0].clone();
-            // todo get the receiver address by the zip
+        }
+
+        if field.key == "question_wMy51M" && field.options.is_some() {
+            letter.receiver_office_name = get_value_from_option(&field.options, current_value.clone())[0].clone();
         }
 
         let check_val = current_value[0].clone();
@@ -723,20 +858,8 @@ async fn create_html(
                 .push(check_val.clone());
         }
 
-        if field.key == "question_mRjGNv" && !check_val.to_owned().is_empty() {
-            let options = match field.options {
-                Some(option) => option,
-                None => vec![],
-            };
-
-            let vec_val = current_value.clone();
-
-            for value in vec_val {
-                match options.iter().find(|&item| item.id == value) {
-                    Some(option) => letter.objection_subject_reasons.push(option.text.clone()),
-                    None => (),
-                };
-            }
+        if field.key == "question_mRjGNv" && !check_val.to_owned().is_empty() && field.options.is_some() {
+            letter.objection_subject_reasons = get_value_from_option(&field.options, current_value.clone());
         }
 
         if field.key == "question_npkqkZ" && !check_val.to_owned().is_empty() {
@@ -780,14 +903,27 @@ async fn create_html(
             };
         }
 
-        // todo test payload and adjust this:
-        if field.key == "question_w4O77k_ba1c873b-???" {
+        if field.key == "question_m697JB_88b38203-b196-4e22-b4da-507b5e16eb6d" {
             meta_no_warranty = FormFieldMeta {
                 key: field.key.clone(),
                 value: current_value[0].clone(),
             };
         }
     }
+
+    let tax_office_address = get_tax_office_query(&letter.receiver_office_zip, &letter.receiver_office_name);
+    let tax_office_address_object = match tax_office_address.await {
+        Ok(address) => address,
+        Err(e) => {
+            info!("sth. went wrong getting the tax office address: {}", e);
+            return "Die angegebenen Finanzamtdaten waren vermutlich fehlerhaft. Das Finanzamt konnte nicht in unserer Datenbank gefunden werden.";
+        }
+    };
+
+    info!("tax office address: {:?}", tax_office_address_object);
+    // todo unpack the address and add the data to the letter object
+
+    //letter.email
 
     info!("start_now: {:?}", &meta_start_now);
     info!("no_warranty: {:?}", &meta_no_warranty);
@@ -904,12 +1040,42 @@ async fn hello() -> &'static str {
     "v1"
 }
 
-async fn get_html(Path(params): Path<HashMap<String, String>>) -> &'static str {
-    // todo return html pages based on params id and type
-    let name = params.get("id");
-    let page = params.get("type");
+async fn get_html(Path(params): Path<HashMap<String, String>>) -> axum::response::Html<String> {
+    let mut name = match params.get("id") {
+        None => "",
+        Some(val) => val.as_str(),
+    };
+    let mut page = match params.get("type") {
+        None => "",
+        Some(val) => val.as_str(),
+    };
+    let email = match params.get("email") {
+        None => "",
+        Some(val) => val.as_str(),
+    };
 
-    ""
+    let allowed_types = vec!["index", "formresult"];
+
+    if !allowed_types.contains(&page) {
+        // todo use error page
+        info!("trying to get page of type {} which doesn't exist.", &page);
+        return "This page does not exist!".to_string().into();
+    }
+
+    if page == "formresult" && email.contains("@") {
+        name = "mapping";
+        page = email; // todo: hash the email
+    }
+
+    let page_result = get_html_page(name, page);
+    
+    return match page_result {
+        Ok(result) => result.into(),
+        Err(e) => {
+            info!("couldn't get page with name {}: {}", &name, e.to_string());
+            "The page does not exist!".to_string().into()
+        }
+    }
 }
 
 async fn get_pdf(Path(params): Path<HashMap<String, String>>) -> &'static str {
@@ -917,6 +1083,7 @@ async fn get_pdf(Path(params): Path<HashMap<String, String>>) -> &'static str {
     // todo: 2. show pdf file by id, show error if not existing
     let name = params.get("id");
     let page = params.get("type");
+    // allowed types: letter, invoice, list
 
     "v1"
 }
@@ -942,8 +1109,9 @@ async fn axum() -> shuttle_service::ShuttleAxum {
         // todo rate limit this request (only 240 per minute per IP)
         .route("/html", post(create_html))
         // todo: rate limit this request (only 10 per minute per IP)
-        .route("/pdf/:id/type/:type", get(get_pdf))
+        .route("/pdf/:id/:type", get(get_pdf))
         .route("/page/:id/:type", get(get_html))
+        //.route("/page/formresult", get(get_html))
         //.layer(RequestIdLayer)
         ;
     let sync_wrapper = SyncWrapper::new(router);
