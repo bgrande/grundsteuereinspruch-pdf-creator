@@ -22,6 +22,8 @@
 - test cases: 
   - 1. all possible fin plz+names -> should be 1 result each
   - 2. all possible PLZ (customer) to fin office -> Ausreißer
+- check if deadline date is correct
++ add date for deadline
 - Rust backend für PDF Erstellung
     + terra für template2html?
     + api with actix
@@ -38,10 +40,10 @@
     + create PDF files
     + prevent second empty page in PDFs
     + pages index, formresult
-    - sql queries + tax office db integration
-      - use the tax office data
-      - how to handle multiple finance office results for same zip? like DUS 40476
-    - create formresult page hashed email
+    + sql queries + tax office db integration
+      + use the tax office data
+      + how to handle multiple finance office results for same zip? like DUS 40476
+    - create formresult page hashed email (or probably even better the result id of the form sent)
       - separate page/endpoint for thank you page (redirect after form fill)
         - when creating the files also create a mapping hash(email) to file_id
         - the mapping should only be called once and then get deleted

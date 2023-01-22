@@ -189,8 +189,7 @@ struct Letter {
     date_created: String,
     sent_date: String,
     subject_text: String,
-    main_text: String,
-    additional_greeting_text: bool,
+    additional_senders: bool,
 }
 #[derive(Serialize)]
 struct Payment {
@@ -393,7 +392,12 @@ fn get_value_from_option(options: &Option<Vec<FormFieldOption>>, vec_val: Vec<St
 
     for value in vec_val {
         match options.iter().find(|&item| item.id == value) {
-            Some(option) => list.push(option.text.clone()),
+            Some(option) => {
+                // only add if we don't have the custom (Sonstiges) option
+                if option.id != "10b80582-5b19-4906-bdb7-c656ffc22ba9" {
+                    list.push(option.text.clone())
+                }
+            },
             None => (),
         };
     }
@@ -552,8 +556,7 @@ async fn create_html(
         date_created: date_now.clone(),
         sent_date: "".to_string(),
         subject_text: "Einspruch gegen den Bescheid zur Feststellung des ".to_string(),
-        main_text: "".to_string(),
-        additional_greeting_text: false,
+        additional_senders: false,
     };
     
     let mut invoice = Invoice {
@@ -773,7 +776,7 @@ async fn create_html(
         }
         
         if letter.sender_names.len() > 1 {
-            letter.additional_greeting_text = true;
+            letter.additional_senders = true;
         }
 
         if field.key == "question_mJWZ0r" {
@@ -860,12 +863,6 @@ async fn create_html(
 
         if field.key == "question_mRjGNv" && !check_val.to_owned().is_empty() && field.options.is_some() {
             letter.objection_subject_reasons = get_value_from_option(&field.options, current_value.clone());
-        }
-
-        if field.key == "question_npkqkZ" && !check_val.to_owned().is_empty() {
-            letter
-                .objection_subject_reasons
-                .push(check_val.clone());
         }
 
         if field.key == "question_npkqkZ" && !check_val.to_owned().is_empty() {
