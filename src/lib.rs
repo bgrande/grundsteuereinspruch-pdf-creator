@@ -75,7 +75,6 @@ lazy_static! {
     };
 }
 
-// todo should return Option<AnyType> if possible -> needs a bit different handling of the value var in the loop
 fn parse_value<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
     where
         D: Deserializer<'de>,
@@ -345,10 +344,42 @@ fn get_sender_object() -> AnyResult<Sender> {
     Ok(sender)
 }
 
-fn calculate_hash<T: Hash>(to_hash: &T) -> u64 {
+#[derive(Hash)]
+struct ToHash {
+    value: String,
+}
+
+fn calculate_hash(to_hash: ToHash) -> u64 {
     let mut hasher = DefaultHasher::new();
     to_hash.hash(&mut hasher);
     hasher.finish()
+}
+
+fn generate_customer_id(first_name: &String, last_name: &String, email: &String) -> String {
+    let hash_object = ToHash {
+        value: format!("{}{}{}{}", Utc::now().format("%Y%m%dH%M%S"), first_name, last_name, email),
+    };
+
+    let hashed = calculate_hash(hash_object).to_string();
+
+    return format!(
+        "{}",
+        hashed.split_at(7).0
+    )
+}
+
+fn generate_invoice_id(customer_id: &String) -> String {
+    let hash_object = ToHash {
+        value: format!("{}{}", Utc::now().format("%Y%m%dH%M%S%f"), customer_id),
+    };
+
+    let hashed = calculate_hash(hash_object).to_string();
+
+    return format!(
+        "{}-{}",
+        Utc::now().format("%Y"),
+        hashed.split_at(6).0
+    )
 }
 
 async fn get_tax_office_query(zip: &String, name: &String) -> AnyResult<TaxOffice, anyhow::Error> {
@@ -403,11 +434,6 @@ fn get_value_from_option(options: &Option<Vec<FormFieldOption>>, vec_val: Vec<St
     }
 
     return list;
-}
-
-#[derive(Hash)]
-struct EmailHash {
-    email: String,
 }
 
 /*
@@ -940,6 +966,9 @@ async fn create_html(
     if meta_origin_page.value != "/fragebogen.html" || meta_token.value != APP_TOKEN {
         return "Der Aufruf war fehlerhaft!";
     }
+
+    invoice.customer_id = generate_customer_id(&letter.first_name, &letter.last_name, &letter.email);
+    invoice.invoice_id = generate_invoice_id(&invoice.customer_id);
 
     let index_path = format!("{}/{}", base_path, TEMPLATE_NAME_INDEX);
     let invoice_path = format!("{}/{}", base_path, TEMPLATE_NAME_INVOICE);
