@@ -577,7 +577,7 @@ async fn create_html(
         email: "".to_string(),
         date: date_now.clone(),
         invoice_id: "".to_string(),   // todo: generate (based on random + customer_id + date)
-        customer_id: "".to_string(),  // todo: generate (based on first_name, last_name)
+        customer_id: "".to_string(),  // todo: generate (based on first_name, last_name, date)
         subject_text: "Ihre Rechnung".to_string(),
         payment: Payment {
             price: "".to_string(),
@@ -586,7 +586,11 @@ async fn create_html(
             email: "".to_string(),
             link: "".to_string(),
         },
-        invoice_objects: vec!["".to_string()],
+        invoice_objects: vec![
+            "Erstellung eines individuellen Einspruchsbriefes an Ihr Finanzamt       |       1,26 €".to_string(),
+            "                                                        MwSt. 19%       |       0,24 €".to_string(),
+            "                                                           Gesamt       |       1,50 €".to_string(),
+        ],
     };
     let mut index = Index {
         first_name: "".to_string(),
