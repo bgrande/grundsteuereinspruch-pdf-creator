@@ -1,3 +1,6 @@
+# 1.0.0
+- add Einspruch wg. Verfassungsklage wie in: https://youtu.be/nZDXlx8dWHA
+
 # 0.2.0
 - add request ids  https://github.com/imbolc/tower-request-id/blob/main/examples/logging.rs
 - split functions into separate files and modules
@@ -23,13 +26,21 @@
   - 1. all possible fin plz+names -> should be 1 result each
   - 2. all possible PLZ (customer) to fin office -> Ausreißer
 - check if deadline date is correct
+- use error page template
+- log success
+- create formresult page hashed email (or probably even better the result id of the form sent)
+    - separate page/endpoint for thank you page (redirect after form fill)
+        - when creating the files also create a mapping hash(email) to file_id
+        - the mapping should only be called once and then get deleted
+        - the separate page should call the endpoint (poll until valid result) and get the actual URL for the overview and redirect to that
++ format Bescheid vom Datum(s)
 + add date for deadline
-- Rust backend für PDF Erstellung
-    + terra für template2html?
++ fix index template rendering
++ Rust backend für PDF Erstellung
+    + tera für template2html?
     + api with actix
     + queries für pdf,html,get
-    + log meta info
-    - log success
+    + log meta info 
     + log errors
     + write payload into json
     + create html pages
@@ -42,9 +53,4 @@
     + pages index, formresult
     + sql queries + tax office db integration
       + use the tax office data
-      + how to handle multiple finance office results for same zip? like DUS 40476
-    - create formresult page hashed email (or probably even better the result id of the form sent)
-      - separate page/endpoint for thank you page (redirect after form fill)
-        - when creating the files also create a mapping hash(email) to file_id
-        - the mapping should only be called once and then get deleted
-        - the separate page should call the endpoint (poll until valid result) and get the actual URL for the overview and redirect to that
+      + how to handle multiple finance office results for same zip? like DUS 40476 

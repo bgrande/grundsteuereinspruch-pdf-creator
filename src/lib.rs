@@ -436,6 +436,30 @@ fn get_value_from_option(options: &Option<Vec<FormFieldOption>>, vec_val: Vec<St
     return list;
 }
 
+fn get_naive_date_from_string(date_value: String) -> AnyResult<NaiveDateTime, anyhow::Error> {
+    Ok(NaiveDateTime::parse_from_str(
+        format!("{}{}", date_value, "T00:05:00+00:00").as_str(),
+        "%Y-%m-%dT%H:%M:%S%z"
+    )?)
+}
+
+fn get_formatted_date_from_string(date: String, format: &str) -> AnyResult<String> {
+    let naive_date_result = get_naive_date_from_string(date)?;
+    let utc_naive_date = Utc.from_local_datetime(&naive_date_result);
+
+    return Ok(match utc_naive_date {
+        Single(date_time) => date_time.format_localized(format, Locale::de_DE).to_string(),
+        LocalResult::Ambiguous(_, _) => {
+            info!("date conversion issue: ambiguous");
+            "".to_string()
+        },
+        LocalResult::None => {
+            info!("date conversion issue: not existing");
+            "".to_string()
+        },
+    });
+}
+
 /*
 fn hash_email(email: &str) -> AnyResult<String> {
 }
@@ -810,13 +834,31 @@ async fn create_html(
         }
 
         if field.key == "question_mJWZ0r" {
-            let tax_office_sent_date_val = current_value[0].clone();
-            let deadline_date_chrono = NaiveDateTime::parse_from_str(
-                tax_office_sent_date_val.as_str(),
-                "%Y-%m-%d"
-            );
+            let sent_date_chrono = get_naive_date_from_string(current_value[0].clone());
 
-            let deadline_date = match deadline_date_chrono {
+            let tax_office_sent_date_val = match sent_date_chrono {
+                Ok(date_time) => date_time,
+                Err(e) => {
+                    info!("date conversion issue: {}", e);
+                    return "Das Datum des Bescheidbriefes ist falsch"
+                },
+            };
+
+            let utc_sent_date = Utc.from_local_datetime(&tax_office_sent_date_val);
+
+            let formatted_sent_date = match utc_sent_date {
+                Single(date_time) => date_time.format_localized("%d.%m.%Y", Locale::de_DE).to_string(),
+                LocalResult::Ambiguous(_, _) => {
+                    info!("date conversion issue: ambiguous");
+                    "".to_string()
+                },
+                LocalResult::None => {
+                    info!("date conversion issue: not existing");
+                    "".to_string()
+                },
+            };
+
+            let deadline_date = match sent_date_chrono {
                 Ok(date_time) => date_time + Duration::weeks(4),
                 Err(e) => {
                     info!("date conversion issue: {}", e);
@@ -837,13 +879,15 @@ async fn create_html(
                 },
             };
 
-            letter.sent_date = tax_office_sent_date_val.clone();
+            letter.sent_date = formatted_sent_date.clone();
 
-            index.sent_date = tax_office_sent_date_val.clone();
+            index.sent_date = formatted_sent_date.clone();
             index.deadline_date = formatted_deadline.clone();
-            list.sent_date = tax_office_sent_date_val.clone();
+
+            list.sent_date = formatted_sent_date.clone();
             list.deadline_date = formatted_deadline.clone();
-            email.sent_date = tax_office_sent_date_val.clone();
+
+            email.sent_date = formatted_sent_date.clone();
             email.deadline_date = formatted_deadline.clone();
         }
 
@@ -880,15 +924,25 @@ async fn create_html(
         }
         // this is Einspruch für Grundsteuerwertbescheid
         if field.key == "question_w8Rgel" && !check_val.to_owned().is_empty() {
+            let formatted_naive_date = match get_formatted_date_from_string(check_val.clone(), "%d.%m.%Y") {
+                Ok(value) => value,
+                _ => "01.01.2025".to_string()
+            };
+
             letter
                 .objection_subject_start_dates
-                .push(check_val.clone());
+                .push(formatted_naive_date);
         }
         // this is Einspruch für Grundsteuermessbescheid
         if field.key == "question_n0DgP9" && !check_val.to_owned().is_empty() {
+            let formatted_naive_date = match get_formatted_date_from_string(check_val.clone(), "%d.%m.%Y") {
+                Ok(value) => value,
+                _ => "01.01.2025".to_string()
+            };
+
             letter
                 .objection_subject_start_dates
-                .push(check_val.clone());
+                .push(formatted_naive_date);
         }
 
         if field.key == "question_mRjGNv" && !check_val.to_owned().is_empty() && field.options.is_some() {
@@ -948,7 +1002,10 @@ async fn create_html(
     };
 
     info!("tax office address: {:?}", tax_office_address_object);
-    // todo unpack the address and add the data to the letter object
+    letter.receiver_office_name = tax_office_address_object.name;
+    letter.receiver_office_zip = tax_office_address_object.zip;
+    letter.receiver_office_city = tax_office_address_object.city;
+    letter.receiver_office_address = format!("{} {}", tax_office_address_object.street, tax_office_address_object.number);
 
     //letter.email
 
