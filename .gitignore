@@ -22,3 +22,5 @@ data/json/*
 
 
 data
+*_bak*
+payload-example*.json

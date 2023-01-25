@@ -33,6 +33,7 @@
         - when creating the files also create a mapping hash(email) to file_id
         - the mapping should only be called once and then get deleted
         - the separate page should call the endpoint (poll until valid result) and get the actual URL for the overview and redirect to that
+- add phone number
 + format Bescheid vom Datum(s)
 + add date for deadline
 + fix index template rendering
