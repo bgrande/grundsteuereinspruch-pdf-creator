@@ -1,12 +1,13 @@
 use std::collections::HashMap;
-use std::{env, fmt, fs};
+use std::{env, fmt, fs, thread, time};
 use std::borrow::Borrow;
 use std::collections::hash_map::DefaultHasher;
+use std::env::VarError;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
 use anyhow::Result as AnyResult;
-use axum::extract::Path;
+use axum::extract::{Path, Query};
 use axum::{extract, routing::get, routing::post, Router, Extension};
 use axum::http::StatusCode;
 use axum::http::{Request};
@@ -16,6 +17,11 @@ use chrono::LocalResult::Single;
 use chrono::prelude::*;
 use html2pdf::{run, CliOptions, Error as H2PError};
 use sync_wrapper::SyncWrapper;
+
+use dotenv::dotenv;
+
+pub(crate) mod send;
+use crate::send::send::send_email;
 
 use rand::{Rng};
 use ring::digest::{Context as RingContext, Digest, SHA256};
@@ -35,9 +41,14 @@ use tera::{Context, Tera};
 
 //todo: use tower for rate limiting
 const APP_TOKEN: &str = "846uoisdhgsdgszdog7846934634089hhuaip12xbo";
+const FORM_ID: &str = "wvXAdv";
+const FORM_NAME: &str = "Einspruch Grundsteuerbescheid";
+
+const BASE_URL: &str = "https://app.grundsteuereinspruch.online";
 
 const TEMPLATE_PATH: &str = "data/templates";
 const TARGET_PATH: &str = "data/diedaten";
+const MAPPING_PATH: &str = "data/diedaten/mapping";
 const DB_PATH: &str = "data/db";
 
 const SENDER_JSON: &str = "sender.json";
@@ -47,13 +58,13 @@ const TEMPLATE_NAME_LETTER: &str = "letter.html";
 const TEMPLATE_NAME_INVOICE: &str = "invoice.html";
 const TEMPLATE_NAME_LIST: &str = "list.html";
 const TEMPLATE_NAME_ERROR: &str = "error.html";
+const TEMPLATE_NAME_MAPPING: &str = "loading.html";
 
 const RESULT_NAME_LETTER: &str = "Grundsteuereinspruch.pdf";
 const RESULT_NAME_INVOICE: &str = "Grundsteuereinspruch-Rechnung.pdf";
 const RESULT_NAME_LIST: &str = "Grundsteuereinspruch-Liste.pdf";
 
-const FORM_ID: &str = "wvXAdv";
-const FORM_NAME: &str = "Einspruch Grundsteuerbescheid";
+
 
 lazy_static! {
     pub static ref TEMPLATES: Tera = {
@@ -251,6 +262,23 @@ struct EMail {
     deadline_date: String,
 }
 
+#[derive(Serialize)]
+struct Mapping {
+    first_name: String,
+    last_name: String,
+    email: String,
+    mapping_id: String,
+
+}
+
+fn get_mapping_hash(respondent: &str, submission: &str, email: &str) -> u64 {
+    let to_hash = ToHash {
+        value: format!("{}{}{}", submission, respondent, email),
+    };
+
+    calculate_hash(to_hash)
+}
+
 fn create_random_id() -> AnyResult<String> {
     let mut random_gen = rand::thread_rng();
     let mut context = RingContext::new(&SHA256);
@@ -267,15 +295,21 @@ fn create_random_id() -> AnyResult<String> {
     Ok(file_id)
 }
 
-fn get_target_path(id: String) -> AnyResult<String> {
-    let current_dir = String::from(env::current_dir()?.to_str().unwrap()); // todo: get rid of the unwrap here
-    let html_path = format!("{}/{}/{}", current_dir, TARGET_PATH, id);
+fn get_target_path(id: String, target_path: String) -> AnyResult<String> {
+    let current_dir_binding = env::current_dir()?;
+    let current_dir_env = match current_dir_binding.to_str() {
+        Some(dir) => dir,
+        None => "",
+    };
+
+    let current_dir = String::from(current_dir_env);
+    let html_path = format!("{}/{}/{}", current_dir, target_path, id);
 
     Ok(html_path)
 }
 
-fn create_path(file_id: String) -> AnyResult<String> {
-    let path = get_target_path(file_id)?;
+fn create_path(file_id: String, target_path: String) -> AnyResult<String> {
+    let path = get_target_path(file_id, target_path)?;
     fs::create_dir_all(&path)?;
     Ok(path)
 }
@@ -514,6 +548,7 @@ fn create_pdf_by_id(base_path: String) -> Option<bool> {
     Some(to_result(html2pdf_letter) && to_result(html2pdf_invoice) && to_result(html2pdf_list))
 }
 
+// todo: this is a separate pdf creation endpoint which should use shared logic from the create_html endpoint
 async fn create_pdf(Path(params): Path<HashMap<String, String>>) -> &'static str {
     let creator_id = match params.get("id") {
         Some(id) => id,
@@ -541,7 +576,7 @@ async fn create_html(
         }
     };
 
-    let base_path = match create_path(file_id.clone()) {
+    let base_path = match create_path(file_id.clone(), TARGET_PATH.to_string()) {
         Ok(path) => path,
         Err(e) => {
             info!("Brieferstellung, path creation: {}", e.to_string());
@@ -563,7 +598,6 @@ async fn create_html(
     match fs::write(payload_json_path, payload_string) {
         Ok(_) => {},
         Err(e) => info!("error writing json for the payload for file_id {}: {}", file_id, e.to_string()),
-
     }
 
     let is_payload_valid = is_valid_payload(&payload);
@@ -1024,6 +1058,34 @@ async fn create_html(
         return "Der Aufruf war fehlerhaft!";
     }
 
+    let mapping_hash = get_mapping_hash(payload.data.respondent_id.as_str(), payload.data.submission_id.as_str(), letter.email.as_str());
+
+    let mapping_base_path = match create_path(mapping_hash.to_string(), MAPPING_PATH.to_string()) {
+        Ok(path) => path,
+        Err(e) => {
+            info!("Brieferstellung, path creation: {}", e.to_string());
+            return "Etwas lief schief beim Erstellen des Briefs (1).";
+            // todo add kontakt-link (use error template)
+        }
+    };
+
+    let mapping_path = format!("{}/index.html", mapping_base_path);
+
+    let mut mapping_context = Context::new();
+    mapping_context.insert("file_id", &file_id);
+
+    let mapping_result = match TEMPLATES.render(TEMPLATE_NAME_MAPPING, &mapping_context) {
+        Ok(result) => result,
+        Err(e) => {
+            info!("Mapping redirect, template rendering: {}", e.to_string());
+            return "Etwas ging schief beim Erstellen des Briefs (0).";
+        }
+    };
+    match fs::write(mapping_path, mapping_result) {
+        Ok(_) => {},
+        Err(_) => info!("Mapping redirect creation failed.")
+    }
+
     invoice.customer_id = generate_customer_id(&letter.first_name, &letter.last_name, &letter.email);
     invoice.invoice_id = generate_invoice_id(&invoice.customer_id);
 
@@ -1116,11 +1178,25 @@ async fn create_html(
         Err(_) => info!("Etwas ging schief beim Erstellen der Tipps (3).")
     }
 
-    return match create_pdf_by_id(base_path) {
+    let pdf_creation_result = match create_pdf_by_id(base_path) {
         // todo: redirect to index
         Some(result) => "success",
         None => "Etwas ging schief beim Erstellen des PDFs",
-    }
+    };
+
+    let link_env = match env::var("BASE_URL") {
+        Ok(val) => val,
+        Err(_) => BASE_URL.to_string(),
+    };
+    let link = format!("{}/page/{}/index", link_env, file_id);
+
+    match send_email(&letter, link) {
+        // ok is just fine
+        Ok(res) => {},
+        Err(e) => info!("unexpected error while sending email: {}", e)
+    };
+
+    return pdf_creation_result;
 }
 
 async fn hello() -> &'static str {
@@ -1128,20 +1204,16 @@ async fn hello() -> &'static str {
 }
 
 async fn get_html(Path(params): Path<HashMap<String, String>>) -> axum::response::Html<String> {
-    let mut name = match params.get("id") {
+    let name = match params.get("id") {
         None => "",
         Some(val) => val.as_str(),
     };
-    let mut page = match params.get("type") {
-        None => "",
-        Some(val) => val.as_str(),
-    };
-    let email = match params.get("email") {
+    let page = match params.get("type") {
         None => "",
         Some(val) => val.as_str(),
     };
 
-    let allowed_types = vec!["index", "formresult"];
+    let allowed_types = vec!["index"];
 
     if !allowed_types.contains(&page) {
         // todo use error page
@@ -1149,13 +1221,43 @@ async fn get_html(Path(params): Path<HashMap<String, String>>) -> axum::response
         return "This page does not exist!".to_string().into();
     }
 
-    if page == "formresult" && email.contains("@") {
-        name = "mapping";
-        page = email; // todo: hash the email
-    }
-
     let page_result = get_html_page(name, page);
     
+    return match page_result {
+        Ok(result) => result.into(),
+        Err(e) => {
+            info!("couldn't get page with name {}: {}", &name, e.to_string());
+            "The page does not exist!".to_string().into()
+        }
+    }
+}
+
+async fn get_result_page(Query(params): Query<HashMap<String, String>>) -> axum::response::Html<String> {
+    let email = match params.get("email") {
+        None => "",
+        Some(val) => val.as_str(),
+    };
+    let submission_id = match params.get("subid") {
+        None => "",
+        Some(val) => val.as_str(),
+    };
+    let respondent_id = match params.get("resp") {
+        None => "",
+        Some(val) => val.as_str(),
+    };
+
+    if !email.contains("@") {
+        // todo: return with error
+    }
+    
+    let name = "mapping";
+    let page = get_mapping_hash(respondent_id, submission_id, email).clone().to_string();
+
+    let sleep_time = time::Duration::from_millis(4000);
+    thread::sleep(sleep_time);
+
+    let page_result = get_html_page(name, &format!("{}/index", page.clone()));
+
     return match page_result {
         Ok(result) => result.into(),
         Err(e) => {
@@ -1183,6 +1285,7 @@ async fn test_create_html(
 
 #[shuttle_service::main]
 async fn axum() -> shuttle_service::ShuttleAxum {
+    dotenv().ok();
     /*let config = GovernorConfigBuilder::default()
     .per_second(4)
     .burst_size(2)
@@ -1198,6 +1301,7 @@ async fn axum() -> shuttle_service::ShuttleAxum {
         // todo: rate limit this request (only 10 per minute per IP)
         .route("/pdf/:id/:type", get(get_pdf))
         .route("/page/:id/:type", get(get_html))
+        .route("/formresult", get(get_result_page))
         //.route("/page/formresult", get(get_html))
         //.layer(RequestIdLayer)
         ;
