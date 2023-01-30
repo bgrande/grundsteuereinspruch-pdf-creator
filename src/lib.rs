@@ -5,6 +5,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::env::VarError;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
+use std::path::PathBuf;
 
 use anyhow::Result as AnyResult;
 use axum::extract::{Path, Query};
@@ -1284,7 +1285,10 @@ async fn test_create_html(
 }
 
 #[shuttle_service::main]
-async fn axum() -> shuttle_service::ShuttleAxum {
+async fn axum(
+    #[shuttle_static_folder::StaticFolder(folder = "data/db")] _db: PathBuf,
+    #[shuttle_static_folder::StaticFolder(folder = "data/templates")] _templates: PathBuf,
+) -> shuttle_service::ShuttleAxum {
     dotenv().ok();
     /*let config = GovernorConfigBuilder::default()
     .per_second(4)
