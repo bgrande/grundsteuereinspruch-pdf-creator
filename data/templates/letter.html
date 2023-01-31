@@ -42,84 +42,84 @@
 	</style>
 </head>
 <body dir="ltr">
-<aside id="bend_marks" class="marks">
-	<div style="margin-top: 2.75cm;">––</div>
-	<div style="margin-top: 4.45cm;">––</div>
-	<div style="margin-top: 5.2cm">––</div>
-</aside>
-<div class="container">
-	<div id="sender_address" class="sender_address">
-		<p class="sender_address">
-			<span class="sender_first_name">{{first_name}}</span> <span class="sender_last_name">{{last_name}}</span>
-		</p>
-		<p>
-			<span class="sender_street">{{street}}</span> <span class="sender_street_number">{{number}}</span><br>
-			<span class="sender_zip">{{zip}}</span> <span class="sender_city">{{city}}</span><br>
-			<span class="sender_email">{{email}}</span>
-		</p>
-	</div>
-
-	{% if sender_names %}
-	<div id="senders" class="senders">
-		<div>{{sender_names_intro}}</div>
-		<p>
-			{%- for sender_name in sender_names %}
-			{{sender_name}}<br>
-			{% endfor -%}
-		</p>
-	</div>
-	{% endif %}
-
-	<div class="start_letter_block">
-		<div id="sender_address_letter" class="sender_address_letter">
+	<aside id="bend_marks" class="marks">
+		<div style="margin-top: 2.75cm;">––</div>
+		<div style="margin-top: 4.45cm;">––</div>
+		<div style="margin-top: 5.2cm">––</div>
+	</aside>
+	<div class="container">
+		<div id="sender_address" class="sender_address">
+			<p class="sender_address">
+				<span class="sender_first_name">{{first_name}}</span> <span class="sender_last_name">{{last_name}}</span>
+			</p>
 			<p>
-				<span class="sender_first_name">{{first_name}}</span> <span class="sender_last_name">{{last_name}}</span>,
-				<span class="sender_street">{{street}}</span> <span class="sender_street_number">{{number}}</span>,
-				<span class="sender_zip">{{zip}}</span> <span class="sender_city">{{city}}</span>
+				<span class="sender_street">{{street}}</span> <span class="sender_street_number">{{number}}</span><br>
+				<span class="sender_zip">{{zip}}</span> <span class="sender_city">{{city}}</span><br>
+				<span class="sender_email">{{email}}</span>
 			</p>
 		</div>
-		<div id="receiver_address" class="receiver_text">
-			<p>Finanzamt {{receiver_office_name}}</p>
-			<p>{{receiver_office_address}}</p>
-			<p>{{receiver_office_zip}} {{receiver_office_city}}</p>
+
+		{% if sender_names %}
+		<div id="senders" class="senders">
+			<div>{{sender_names_intro}}</div>
+			<p>
+				{%- for sender_name in sender_names %}
+				{{sender_name}}<br>
+				{% endfor -%}
+			</p>
 		</div>
+		{% endif %}
+
+		<div class="start_letter_block">
+			<div id="sender_address_letter" class="sender_address_letter">
+					<p>
+						<span class="sender_first_name">{{first_name}}</span> <span class="sender_last_name">{{last_name}}</span>,
+						<span class="sender_street">{{street}}</span> <span class="sender_street_number">{{number}}</span>,
+						<span class="sender_zip">{{zip}}</span> <span class="sender_city">{{city}}</span>
+					</p>
+			</div>
+			<div id="receiver_address" class="receiver_text">
+				<p>Finanzamt {{receiver_office_name}}</p>
+				<p>{{receiver_office_address}}</p>
+				<p>{{receiver_office_zip}} {{receiver_office_city}}</p>
+			</div>
+		</div>
+
+		<main id="main">
+			<p class="send_date">
+				<span class="write_date">{{date_created}}</span>
+			</p>
+			<div id="subject_line">
+				<p class="subject_text">
+					<b>
+						<span class="subject_title">Aktenzeichen/Steuernr: {{reference_number}}</span>
+						<span class="subject_content">{{subject_text}} {% for subj in objection_subjects %}{% if loop.index == 2 %} und {% endif %}{{subj}}{% endfor %}</span>
+					</b>
+				</p>
+			</div>
+			<p class="title">Sehr geehrte Damen und Herren,</p>
+			<p>
+				gegen den o.g. Bescheid zum <i>{% for date in objection_subject_start_dates %}{% if loop.index == 2%} bzw. {% endif %}{{date}}{% endfor %}</i>
+				über die Feststellung des {% for subj in objection_subjects %}{% if loop.index == 2 %} und {% endif %}{{subj}}{% endfor %} vom {{sent_date}}
+				lege{% if additional_senders %}n wir{% else %} ich{% endif %} hiermit Einspruch ein.
+
+				Begründung:
+			</p>
+			<ul>
+				{% for objection in objection_subject_reasons %}<li>{{objection}}</li>{% endfor %}
+			</ul>
+
+			<p>
+				{% if additional_senders %}Wir bitten{% else %}Ich bitte{% endif %} außerdem darum, den Eingang dieses Schreibens zu bestätigen.
+			</p>
+
+			<p class="send_greet">Mit freundlichen Grüßen</p>
+			<p style="margin-top: 1cm">&nbsp;</p>
+			<p>{% if additional_senders %}i.V. {% endif %}{{first_name}} {{last_name}}</p>
+		</main>
 	</div>
 
-	<main id="main">
-		<p class="send_date">
-			<span class="write_date">{{date_created}}</span>
-		</p>
-		<div id="subject_line">
-			<p class="subject_text">
-				<b>
-					<span class="subject_title">Aktenzeichen/Steuernr: {{reference_number}}</span>
-					<span class="subject_content">{{subject_text}} {% for subj in objection_subjects %}{% if loop.index == 2 %} und {% endif %}{{subj}}{% endfor %}</span>
-				</b>
-			</p>
-		</div>
-		<p class="title">Sehr geehrte Damen und Herren,</p>
-		<p>
-			gegen den o.g. Bescheid zum <i>{% for date in objection_subject_start_dates %}{% if loop.index == 2%} bzw. {% endif %}{{date}}{% endfor %}</i>
-			über die Feststellung des {% for subj in objection_subjects %}{% if loop.index == 2 %} und {% endif %}{{subj}}{% endfor %} vom {{sent_date}}
-			lege{% if additional_senders %}n wir{% else %} ich{% endif %} hiermit Einspruch ein.
-
-			Begründung:
-		</p>
-		<ul>
-			{% for objection in objection_subject_reasons %}<li>{{objection}}</li>{% endfor %}
-		</ul>
-
-		<p>
-			{% if additional_senders %}Wir bitten{% else %}Ich bitte{% endif %} außerdem darum, den Eingang dieses Schreibens zu bestätigen.
-		</p>
-
-		<p class="send_greet">Mit freundlichen Grüßen</p>
-		<p style="margin-top: 1cm">&nbsp;</p>
-		<p>{% if additional_senders %}i.V. {% endif %}{{first_name}} {{last_name}}</p>
-	</main>
-</div>
-
-<script type="application/javascript">
+	<script type="application/javascript">
 		(function (document) {
 			const urlSearchParams = new URLSearchParams(window.location.search);
 			const params = Object.fromEntries(urlSearchParams.entries());
