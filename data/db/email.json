@@ -1,0 +1,8 @@
+{
+  "from_name": "Grundsteuereinspruch Online",
+  "from_email": "versand@grundsteuereinspruch.online",
+  "smtp_host": "mxe875.netcup.net",
+  "smtp_user": "",
+  "smtp_pass": "",
+  "smtp_port": "465"
+}
