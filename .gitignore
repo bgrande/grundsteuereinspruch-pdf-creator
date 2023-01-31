@@ -27,6 +27,7 @@ src/pdf
 # app
 test
 .env
-data
+data/diedaten
+Secrets.toml
 *_bak*
 payload-example*.json

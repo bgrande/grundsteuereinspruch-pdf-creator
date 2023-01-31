@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Grundsteuerbescheid - Einspruch schnell und einfach online erledigen - Ihre Rechnung</title>
+
+	<meta name="robots" content="noindex,nofollow"/>
+
+	<style>
+		html {box-sizing: border-box}
+		body {margin: 0; overflow: auto; padding: 0; left: 0; right: 0; top: 0; bottom: 0; color: #000000; width: auto; height: auto; background: #ffffff; }
+		.container { box-sizing: border-box; position: relative; margin: 0 1cm; font-family: "Cumberland",serif }
+		p { margin-bottom: 0.21cm; letter-spacing: 0.1pt; line-height: 1.3; font-size: 11pt}
+
+		aside { position: absolute; margin: 0; top: 7.2cm; left: 0; width: 1.1cm; height: 16cm; padding: 0; }
+		aside div { font-family: "Cumberland", monospace; color: #999999}
+
+		div.sender_address { position: absolute; width: 10cm; height: 3cm; border: none; padding: 0; page-break-after: avoid;}
+		div.sender_address p { font-size: 11.5pt}
+		div.sender_address p.sender_address { text-align: left; font-size: 12.5pt; line-height: 1.3; margin-top: 0; margin-bottom: 0.1cm; font-family: "Thorndale", serif }
+
+		div.meta { position: absolute; right: 0; width: auto; max-width: 8cm; height: 7.6cm; border: none; padding: 0; page-break-after: avoid;}
+
+		.start_letter_block {position: relative; top: 3.8cm; width: 15cm; }
+		.sender_address_letter { position: relative; height: 0.9cm; border: none; padding: 0; overflow: hidden }
+		.sender_address_letter p { margin-bottom: 0; font-style: normal; font-size: 9pt }
+		.receiver_text { position: relative; height: 2.51cm; border: none; padding: 0; padding-top: 0.1cm;}
+		.receiver_text p { font-family: "Cumberland", monospace; font-size: 11pt; margin: 0; line-height: 1.5 }
+
+		main { position: relative; top: 4.8cm; width: 100%; height: auto; border: none; padding: 0; }
+
+		ul {list-style: none; padding: 0; padding-left: 0.3cm;}
+		.inv_object {width: 70%}
+		.inv_object.with_border {border-bottom: 1px solid #ccc;}
+
+		.send_date {text-align: right; right: 0; margin-bottom: 0}
+		.send_greet {margin-top: 0.63cm; page-break-after: avoid}
+		.subject_text {margin-top: 0.63cm; margin-bottom: 0.63cm}
+		.title {line-height: 2}
+
+		footer {box-sizing: border-box; position: fixed; bottom: 1cm; margin-top: 2cm; font-family: "Cumberland",serif; font-size: 11pt; width: 100%;}
+		footer p {font-size: 10pt}
+
+		.debug .start_letter_block {overflow: hidden; width: 10cm; border: 1px solid red}
+		.debug div.sender_address, .debug div.meta, .debug .marks, .debug .marks div, .debug main, .debug .subject_text, .debug .send_date {border: 1px solid red}
+		.debug .sender_address_letter {overflow: hidden; width: 15cm;}
+	</style>
+</head>
+<body dir="ltr">
+<aside id="bend_marks" class="marks">
+	<div style="margin-top: 2.75cm;">––</div>
+	<div style="margin-top: 4.45cm;">––</div>
+	<div style="margin-top: 5.2cm">––</div>
+</aside>
+<div class="container">
+	<div id="sender_address" class="sender_address">
+		<p class="sender_address">
+			{% if sender_company_name %}<span class="company">{{sender_company_name}}</span>{% else %}<span class="sender_first_name">{{sender_first_name}}</span> <span class="sender_last_name">{{sender_last_name}}</span>{% endif %}
+		</p>
+		<p>
+			<span class="sender_street">{{sender_street}}</span> <span class="sender_street_number">{{sender_number}}</span><br>
+			<span class="sender_zip">{{sender_zip}}</span> <span class="sender_city">{{sender_city}}</span><br>
+			<span class="sender_email">{{sender_email}}</span>
+		</p>
+	</div>
+
+	<div id="additional" class="meta">
+		<div style="line-height: 2em">
+			<img src="https://grundsteuereinspruch.online/images/logo.svg" style="width: 2em; height: 2em" alt="Grundsteuereinspruch Online Logo" />
+			<span style="color: #9C5AFF; vertical-align: text-bottom">Grundsteuereinspruch Online</span>
+		</div>
+		<p style="top: 4.4cm; position: absolute; min-width: 6.5cm">
+			<b>Rechnungsnummer</b>: {{invoice_id}}<br>
+			<b>Kundennummer</b>: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{customer_id}}<br>
+			<b>Rechnungsdatum</b>: &nbsp;&nbsp;&nbsp;{{date}}
+		</p>
+	</div>
+
+	<div class="start_letter_block">
+		<div id="sender_address_letter" class="sender_address_letter">
+			<p>
+			</p>
+		</div>
+		<div id="receiver_address" class="receiver_text">
+			<p>{{first_name}} {{last_name}}</p>
+			<p>{{street}} {{number}}</p>
+			<p>{{zip}} {{city}}</p>
+		</div>
+	</div>
+
+	<main id="main">
+		<div id="subject_line">
+			<p class="subject_text">
+				<b>
+					<span class="subject_title"></span>
+					<span class="subject_text">{{subject_text}}</span>
+				</b>
+			</p>
+		</div>
+		<p class="title">Sehr geehrte Damen und Herren,</p>
+		<p>Für die Erstellung Ihres Grundsteuereinspruchbriefs erlauben wir uns zu berechnen:</p><br>
+		<ul>
+			{%- for invoice_object in invoice_objects %}
+			<li class="inv_object{% if loop.last != loop.index %} with_border{% endif %}"><pre>{{invoice_object}}</pre></li>
+			{% endfor -%}
+		</ul>
+		<br>
+
+		<p>Die Rechnung wurde bereits via Stripe beglichen.</p>
+
+		<p class="send_greet">Mit freundlichen Grüßen</p>
+		<p>{{sender_first_name}} {{sender_last_name}} - {{sender_company_name}}</p>
+
+		<footer>
+			<div style="display: flex; flex-flow: row; justify-content: space-between; width: 90%">
+				<div style="min-width: 4cm">
+					<b>Benedikt Grande - <br>Softwareentwicklung</b>
+					<p>Reinhard-Reichenbach-Str. 5<br>
+						65385 Rüdesheim a. R.<br>
+						Deutschland
+					</p>
+					<p>kontakt@grundsteuereinspruch.online</p>
+				</div>
+				<div style="min-width: 6.5cm">
+					<b>Bankverbindungen</b>
+					<p>n26<br>
+						IBAN DE08 1001 1001 2629 1177 40<br>
+						BIC/Swift NTSBDEB1XXX</p>
+				</div>
+				<div style="min-width: 4cm">
+					<b>Geschäftsdaten</b>
+					<p>Steuernr: 037 822 30760<br>
+						Ust-Id: DE 298 335 594
+					</p>
+				</div>
+			</div>
+		</footer>
+	</main>
+
+</div>
+
+
+<script type="application/javascript">
+		(function (document) {
+			const urlSearchParams = new URLSearchParams(window.location.search);
+			const params = Object.fromEntries(urlSearchParams.entries());
+
+			let body = document.body;
+			if (params.debug === '1') {
+				body.classList.add('debug')
+			}
+		})(document);
+	</script>
+</body>
+</html>
