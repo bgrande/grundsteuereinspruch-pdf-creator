@@ -1070,10 +1070,17 @@ async fn create_html(
         }
     };
 
+    let base_url = match env::var("BASE_URL") {
+        Ok(val) => val,
+        Err(_) => BASE_URL.to_string(),
+    };
+    let link = format!("{}/page/{}/index", base_url, file_id);
+
     let mapping_path = format!("{}/index.html", mapping_base_path);
 
     let mut mapping_context = Context::new();
     mapping_context.insert("file_id", &file_id);
+    mapping_context.insert("base_url", &base_url);
 
     let mapping_result = match TEMPLATES.render(TEMPLATE_NAME_MAPPING, &mapping_context) {
         Ok(result) => result,
@@ -1185,12 +1192,6 @@ async fn create_html(
         None => "Etwas ging schief beim Erstellen des PDFs",
     };
 
-    let link_env = match env::var("BASE_URL") {
-        Ok(val) => val,
-        Err(_) => BASE_URL.to_string(),
-    };
-    let link = format!("{}/page/{}/index", link_env, file_id);
-
     match send_email(&letter, link) {
         // ok is just fine
         Ok(res) => {},
@@ -1285,10 +1286,7 @@ async fn test_create_html(
 }
 
 #[shuttle_service::main]
-async fn axum(
-    #[shuttle_static_folder::StaticFolder(folder = "data/db")] _db: PathBuf,
-    #[shuttle_static_folder::StaticFolder(folder = "data/templates")] _templates: PathBuf,
-) -> shuttle_service::ShuttleAxum {
+async fn axum() -> shuttle_service::ShuttleAxum {
     dotenv().ok();
     /*let config = GovernorConfigBuilder::default()
     .per_second(4)
