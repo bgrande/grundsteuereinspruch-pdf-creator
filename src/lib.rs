@@ -6,9 +6,10 @@ use std::env::VarError;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::Result as AnyResult;
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::{extract, routing::get, routing::post, Router, Extension};
 use axum::http::StatusCode;
 use axum::http::{Request};
@@ -18,11 +19,13 @@ use chrono::LocalResult::Single;
 use chrono::prelude::*;
 use html2pdf::{run, CliOptions, Error as H2PError};
 use sync_wrapper::SyncWrapper;
+use shuttle_secrets::SecretStore;
+
 
 use dotenv::dotenv;
 
 pub(crate) mod send;
-use crate::send::send::send_email;
+use crate::send::send::{get_email_config, send_email};
 
 use rand::{Rng};
 use ring::digest::{Context as RingContext, Digest, SHA256};
@@ -565,6 +568,7 @@ async fn create_pdf(Path(params): Path<HashMap<String, String>>) -> &'static str
 }
 
 async fn create_html(
+    State(state): State<Arc<AppState>>,
     Path(params): Path<HashMap<String, String>>,
     extract::Json(payload): extract::Json<QuestionResult>
 ) -> &'static str  {
@@ -1042,8 +1046,6 @@ async fn create_html(
     letter.receiver_office_city = tax_office_address_object.city;
     letter.receiver_office_address = format!("{} {}", tax_office_address_object.street, tax_office_address_object.number);
 
-    //letter.email
-
     info!("start_now: {:?}", &meta_start_now);
     info!("no_warranty: {:?}", &meta_no_warranty);
     info!("origin_page: {:?}", &meta_origin_page);
@@ -1192,7 +1194,7 @@ async fn create_html(
         None => "Etwas ging schief beim Erstellen des PDFs",
     };
 
-    match send_email(&letter, link) {
+    match send_email(&letter, link, get_email_config(state.email_user.clone(), state.email_pass.clone())) {
         // ok is just fine
         Ok(res) => {},
         Err(e) => info!("unexpected error while sending email: {}", e)
@@ -1279,20 +1281,34 @@ async fn get_pdf(Path(params): Path<HashMap<String, String>>) -> &'static str {
     "v1"
 }
 
-async fn test_create_html(
-    axum::extract::Json(data): axum::extract::Json<serde_json::Value>
-) -> axum::extract::Json<Value>  {
-    json!(data).into()
+struct AppState {
+    email_user: String,
+    email_pass: String,
+}
+
+fn get_secret(secret_store: &SecretStore, name: &str) -> String {
+    return if let Some(secret) = secret_store.get(name) {
+        secret
+    } else {
+        "".to_string()
+    };
 }
 
 #[shuttle_service::main]
-async fn axum() -> shuttle_service::ShuttleAxum {
+async fn axum(
+    #[shuttle_secrets::Secrets] secret_store: SecretStore,
+) -> shuttle_service::ShuttleAxum {
     dotenv().ok();
     /*let config = GovernorConfigBuilder::default()
     .per_second(4)
     .burst_size(2)
     .finish()
     .unwrap();*/
+
+    let shared_state = Arc::new(AppState {
+        email_user: get_secret(&secret_store, "SMTP_USER"),
+        email_pass: get_secret(&secret_store, "SMTP_PASS"),
+    });
 
     let router = Router::new()
         .route("/", get(hello))
@@ -1306,6 +1322,7 @@ async fn axum() -> shuttle_service::ShuttleAxum {
         .route("/formresult", get(get_result_page))
         //.route("/page/formresult", get(get_html))
         //.layer(RequestIdLayer)
+        .with_state(shared_state)
         ;
     let sync_wrapper = SyncWrapper::new(router);
 

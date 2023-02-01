@@ -10,7 +10,7 @@ use crate::Letter;
 const CONFIG_FILE: &str = "data/db/email.json";
 
 #[derive(Serialize, Deserialize, Debug)]
-struct EmailConfig {
+pub(crate) struct EmailConfig {
     from_name: String,
     from_email: String,
     smtp_host: String,
@@ -19,7 +19,18 @@ struct EmailConfig {
     smtp_port: String,
 }
 
-pub(crate) fn send_email(letter: &Letter, link: String) -> AnyResult<bool> {
+pub(crate) fn get_email_config(user: String, pass: String) -> AnyResult<EmailConfig> {
+    let data_result = fs::read_to_string(CONFIG_FILE);
+    let data = data_result?;
+    let mut json_config: EmailConfig = serde_json::from_str(&data)?;
+
+    json_config.smtp_user = user;
+    json_config.smtp_pass = pass;
+
+    Ok(json_config)
+}
+
+pub(crate) fn send_email(letter: &Letter, link: String, email_conf: AnyResult<EmailConfig>) -> AnyResult<bool> {
     let email = &letter.email;
 
     let body = format!(
@@ -38,15 +49,9 @@ mail@grundsteuereinspruch.online
         link
     );
 
-    let data_result = fs::read_to_string(CONFIG_FILE);
-    let data = match data_result {
-        Ok(dat) => dat,
-        Error => "".to_string()
-    };
+    let email_config = email_conf?;
 
-    let json_config: EmailConfig = serde_json::from_str(&data)?;
-
-    let from = format!("{} <{}>", json_config.from_name, json_config.from_email);
+    let from = format!("{} <{}>", email_config.from_name, email_config.from_email);
     let subject = "Ihr Brief von Grundsteuereinspruch Online";
     let to = format!("{} {} <{}>", letter.first_name, letter.last_name, email);
 
@@ -59,9 +64,9 @@ mail@grundsteuereinspruch.online
         .body(body)
         ?;
 
-    let creds = Credentials::new(json_config.smtp_user, json_config.smtp_pass);
+    let creds = Credentials::new(email_config.smtp_user, email_config.smtp_pass);
 
-    let mailer = SmtpTransport::relay(&json_config.smtp_host)?
+    let mailer = SmtpTransport::relay(&email_config.smtp_host)?
         .credentials(creds)
         .build();
 

@@ -9,9 +9,14 @@
 - Einspruchtemplate tests
 - Einspruchtemplate multiple pages
 - ausländische Nutzer? 
+- collision check for file_id folder -> if already existing, try again (until no collision) -> preventing accidental override and data leaking
+- Use None or Error instead of empty string
 
 # 0.1.0
 - how to get the tax office db on deploy?
+  - einchecken in git?
+- templates in deploy: einchecken?
+- email, etc.: secrets + einchecken? 
 - how to integrate the templates (separate repo) -
   - either git submodule or wget/curl before deploy? (in deploy script)
   - include at compile vs deliver with deployment
@@ -21,7 +26,10 @@
 - make sure all required data is available + fix missing
 - test different cases (multiple page, 10 senders, ...)
 - test at shuttle endpoint
-- deploy to shuttle.rs
++ deploy to shuttle.rs
+  + fix with secrets
+  + add config to vcs
+  + add db to vcs
 - test cases: 
   - 1. all possible fin plz+names -> should be 1 result each
   - 2. all possible PLZ (customer) to fin office -> Ausreißer
