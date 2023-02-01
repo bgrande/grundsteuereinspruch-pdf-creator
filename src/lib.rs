@@ -374,6 +374,7 @@ fn is_valid_payload(payload: &QuestionResult) -> bool {
 
 fn get_sender_object() -> AnyResult<Sender> {
     let file_path = format!("{}/{}", DB_PATH, SENDER_JSON);
+    info!("sender data file path: {}", file_path);
 
     let data = fs::read_to_string(file_path);
     let data_string = data?;
