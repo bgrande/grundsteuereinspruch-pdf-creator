@@ -300,15 +300,7 @@ fn create_random_id() -> AnyResult<String> {
 }
 
 fn get_target_path(id: String, target_path: String) -> AnyResult<String> {
-    let current_dir_binding = env::current_dir()?;
-    let current_dir_env = match current_dir_binding.to_str() {
-        Some(dir) => dir,
-        None => "",
-    };
-
-    let current_dir = String::from(current_dir_env);
-    let html_path = format!("{}/{}/{}", current_dir, target_path, id);
-
+    let html_path = format!("{}/{}", target_path, id);
     Ok(html_path)
 }
 
