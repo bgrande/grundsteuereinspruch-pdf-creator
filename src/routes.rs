@@ -4,10 +4,14 @@ use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
 use axum::{extract};
+use axum::body::StreamBody;
+use axum::http::{header, StatusCode};
+use axum::response::{IntoResponse, AppendHeaders};
 use chrono::{Duration, LocalResult, Utc};
 use chrono::LocalResult::Single;
 use chrono::prelude::*;
 use tracing::info;
+use tokio_util::io::ReaderStream;
 
 use crate::crypt::*;
 use crate::db::*;
@@ -23,6 +27,7 @@ use crate::send::send::{get_email_config, send_email};
 
 use structopt::lazy_static::lazy_static;
 use tera::{Context, Tera};
+use tokio::fs::File;
 
 lazy_static! {
     pub static ref TEMPLATES: Tera = {
@@ -768,12 +773,61 @@ pub async fn hello() -> &'static str {
     "v1"
 }
 
-pub async fn get_pdf(Path(params): Path<HashMap<String, String>>) -> &'static str {
-    // todo: get PDF by id
-    // todo: 2. show pdf file by id, show error if not existing
-    let name = params.get("id");
-    let page = params.get("type");
-    // allowed types: letter, invoice, list
+pub async fn get_pdf(Path(params): Path<HashMap<String, String>>) -> impl IntoResponse {
+    let name = match params.get("id") {
+        None => "",
+        Some(val) => val.as_str(),
+    };
+    let page = match params.get("type") {
+        None => "",
+        Some(val) => val.as_str(),
+    };
 
-    "v1"
+    let allowed_types = vec!["letter", "invoice"];
+
+    /*
+    let mut headers = AppendHeaders([
+        (header::CONTENT_TYPE, "text/html"),
+        (header::CONTENT_LANGUAGE, "Content-Language: de-DE"),
+    ]);
+    */
+
+    if !allowed_types.contains(&page) {
+        // todo use error page
+        info!("trying to get page of type {} which doesn't exist.", &page);
+        // todo: redirect to error page?
+        return Err((StatusCode::NOT_FOUND, "This page does not exist!".to_string().into()));
+    }
+
+    let pdf_name = match page {
+        "letter" => RESULT_NAME_LETTER,
+        "invoice" => RESULT_NAME_INVOICE,
+        "list" => RESULT_NAME_LIST,
+        _ => "",
+    };
+
+    let file_path = format!("{}/{}/{}", TARGET_PATH, name, pdf_name);
+
+    let file = match File::open(file_path).await {
+        Ok(file) => file,
+        Err(err) => {
+            info!("could not find pdf file with page {}, page {} and id {}, current dir: {}", &page, &pdf_name, &name, env::current_dir().unwrap().display());
+            return Err((StatusCode::NOT_FOUND, format!("File not found: {}", err)))
+        },
+    };
+    
+    // convert the `AsyncRead` into a `Stream`
+    let stream = ReaderStream::new(file);
+    // convert the `Stream` into an `axum::body::HttpBody`
+    let body = StreamBody::new(stream);
+
+    let headers = AppendHeaders([
+        (header::CONTENT_TYPE, "application/pdf"),
+        (
+            header::CONTENT_DISPOSITION,
+            "attachment; filename=\"GrundsteuereinspruchOnline-Rechnung.pdf\"",
+        ),
+    ]);
+
+    Ok((headers, body))
 }

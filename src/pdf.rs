@@ -1,14 +1,16 @@
+use std::fs;
 use html2pdf::{run, CliOptions, Error as H2PError};
 use structopt::StructOpt;
+use tokio::fs::File;
 use tracing::info;
 
 use crate::config::TEMPLATE_NAME_LETTER;
 use crate::config::TEMPLATE_NAME_INVOICE;
 use crate::config::TEMPLATE_NAME_LIST;
 
-const RESULT_NAME_LETTER: &str = "Grundsteuereinspruch.pdf";
-const RESULT_NAME_INVOICE: &str = "Grundsteuereinspruch-Rechnung.pdf";
-const RESULT_NAME_LIST: &str = "Grundsteuereinspruch-Liste.pdf";
+pub const RESULT_NAME_LETTER: &str = "Grundsteuereinspruch.pdf";
+pub const RESULT_NAME_INVOICE: &str = "Grundsteuereinspruch-Rechnung.pdf";
+pub const RESULT_NAME_LIST: &str = "Grundsteuereinspruch-Liste.pdf";
 
 pub fn create_pdf_by_id(base_path: String) -> Option<bool> {
     let html2pdf_letter = match html2pdf(
