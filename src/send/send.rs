@@ -2,10 +2,11 @@ use anyhow::Result as AnyResult;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
 use serde::{Deserialize, Serialize};
-use std::{env, fs};
+use std::fs;
 use lettre::message::header::{ContentTransferEncoding, ContentType};
 use tracing::info;
-use crate::Letter;
+
+use crate::objects::Letter;
 
 const CONFIG_FILE: &str = "data/db/email.json";
 

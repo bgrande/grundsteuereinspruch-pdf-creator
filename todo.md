@@ -1,47 +1,49 @@
 # 1.0.0
 - add Einspruch wg. Verfassungsklage wie in: https://youtu.be/nZDXlx8dWHA
+- split request handler functions into separate sub functions
 
 # 0.2.0
 - add request ids  https://github.com/imbolc/tower-request-id/blob/main/examples/logging.rs
-- split functions into separate files and modules
-- split request handler functions into separate sub functions
-- add a password (basic auth) (the customer's zip) to make it a bit more secure
++ split functions into separate files and modules
+
+- add a password (basic auth) (the customer's zip) to make it a bit more secure 
+  -> needs a separate store (file) with the PLZ and creating this 
 - Einspruchtemplate tests
 - Einspruchtemplate multiple pages
 - ausländische Nutzer? 
 - collision check for file_id folder -> if already existing, try again (until no collision) -> preventing accidental override and data leaking
 - Use None or Error instead of empty string
+- test cases:
+    - 1. all possible fin plz+names -> should be 1 result each
+    - 2. all possible PLZ (customer) to fin office -> Ausreißer
+    - check if deadline date is correct
+    - test different cases (multiple page, 10 senders, ...)
+    + test at shuttle endpoint -> doesn't find files
+- use error page template
+- log success
+- add phone number
 
 # 0.1.0
-- how to get the tax office db on deploy?
++ how to get the tax office db on deploy?
   - einchecken in git?
-- templates in deploy: einchecken?
-- email, etc.: secrets + einchecken? 
-- how to integrate the templates (separate repo) -
++ templates in deploy: einchecken?
++ email, etc.: secrets + einchecken? 
++ how to integrate the templates (separate repo) -
   - either git submodule or wget/curl before deploy? (in deploy script)
   - include at compile vs deliver with deployment
-- Formulierungen + snippets für Widerspruch/Einspruch schreiben
++ Formulierungen + snippets für Widerspruch/Einspruch schreiben
     + Formulierung im Schreiben für Proforma Widerspruch/Einspruch: ???
       -> Begründung wird nachgereicht
-- make sure all required data is available + fix missing
-- test different cases (multiple page, 10 senders, ...)
-- test at shuttle endpoint
++ make sure all required data is available + fix missing
 + deploy to shuttle.rs
   + fix with secrets
   + add config to vcs
   + add db to vcs
-- test cases: 
-  - 1. all possible fin plz+names -> should be 1 result each
-  - 2. all possible PLZ (customer) to fin office -> Ausreißer
-- check if deadline date is correct
-- use error page template
-- log success
-- create formresult page hashed email (or probably even better the result id of the form sent)
-    - separate page/endpoint for thank you page (redirect after form fill)
++ create formresult page hashed email (or probably even better the result id of the form sent)
+    + separate page/endpoint for thank you page (redirect after form fill)
         - when creating the files also create a mapping hash(email) to file_id
         - the mapping should only be called once and then get deleted
         - the separate page should call the endpoint (poll until valid result) and get the actual URL for the overview and redirect to that
-- add phone number
 + format Bescheid vom Datum(s)
 + add date for deadline
 + fix index template rendering

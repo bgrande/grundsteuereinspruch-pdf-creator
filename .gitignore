@@ -19,11 +19,6 @@ data/json/*
 #/target
 /Cargo.lock
 
-# temp
-src/crypt
-src/html
-src/pdf
-
 # app
 test
 .env
