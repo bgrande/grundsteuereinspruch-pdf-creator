@@ -18,7 +18,7 @@ data-encoding = "2.3.3"
 lettre = {version = "0.10", features = ["builder"] }
 sync_wrapper = "0.1"
 sqlx = { version = "0.6", features = [ "runtime-tokio-rustls", "sqlite" ] }
-tokio = "1.20"
+tokio = { version = "1.20", features = [ "macros", "io-util" ]}
 tokio-util = {version = "0.7.4", features = [ "io" ] }
 html2pdf = "0.5"
 rand = "0.8.5"

@@ -1,18 +1,19 @@
 # 1.0.0
 - add Einspruch wg. Verfassungsklage wie in: https://youtu.be/nZDXlx8dWHA
 - split request handler functions into separate sub functions
+- ausländische Nutzer?
+- add a password (basic auth) (the customer's zip) to make it a bit more secure
+-> needs a separate store (file) with the PLZ and creating this
+- add request ids  https://github.com/imbolc/tower-request-id/blob/main/examples/logging.rs
+- Use None or Error instead of empty string
+- log success
 
 # 0.2.0
-- add request ids  https://github.com/imbolc/tower-request-id/blob/main/examples/logging.rs
 + split functions into separate files and modules
-
-- add a password (basic auth) (the customer's zip) to make it a bit more secure 
-  -> needs a separate store (file) with the PLZ and creating this 
+- main endpoint for separate application
 - Einspruchtemplate tests
 - Einspruchtemplate multiple pages
-- ausländische Nutzer? 
 - collision check for file_id folder -> if already existing, try again (until no collision) -> preventing accidental override and data leaking
-- Use None or Error instead of empty string
 - test cases:
     - 1. all possible fin plz+names -> should be 1 result each
     - 2. all possible PLZ (customer) to fin office -> Ausreißer
@@ -20,10 +21,10 @@
     - test different cases (multiple page, 10 senders, ...)
     + test at shuttle endpoint -> doesn't find files
 - use error page template
-- log success
 - add phone number
 
 # 0.1.0
++ download pdf
 + how to get the tax office db on deploy?
   - einchecken in git?
 + templates in deploy: einchecken?
