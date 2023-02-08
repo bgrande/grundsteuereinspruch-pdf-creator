@@ -10,7 +10,8 @@
 
 # 0.2.0
 + split functions into separate files and modules
-- main endpoint for separate application
++ main endpoint for separate application
+- use logging instead of tracing (with error!, debug!, ...)
 - Einspruchtemplate tests
 - Einspruchtemplate multiple pages
 - collision check for file_id folder -> if already existing, try again (until no collision) -> preventing accidental override and data leaking

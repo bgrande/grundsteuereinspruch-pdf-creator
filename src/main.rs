@@ -44,6 +44,14 @@ async fn main()  {
         Err(_) => "".to_string(),
     };
 
+    let port: u16 = match env::var("BIND_PORT") {
+        Ok(val) => match val.parse() {
+            Ok(val) => val,
+            _ => 8000
+        },
+        Err(_) => 8000,
+    };
+
     let shared_state = Arc::new(AppState {
         email_user: smtp_user,
         email_pass: smtp_pass,
@@ -59,17 +67,16 @@ async fn main()  {
         .route("/pdf/:id/:type", get(get_pdf))
         .route("/page/:id/:type", get(get_html))
         .route("/formresult", get(get_result_page))
-        //.route("/page/formresult", get(get_html))
         //.layer(RequestIdLayer)
         .with_state(shared_state)
         ;
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
 
     match axum::Server::bind(&addr)
         .serve(router.into_make_service())
         .await {
-        Ok(_) => info!("started server successfully"),
+        Ok(_) => info!("started server successfully at port {}", port),
         Err(e) => error!("error while starting server: {}", e)
     };
 }

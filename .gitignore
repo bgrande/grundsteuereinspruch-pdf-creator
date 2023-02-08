@@ -26,3 +26,4 @@ data/diedaten
 Secrets.toml
 *_bak*
 payload-example*.json
+deploy/*_rsa*
