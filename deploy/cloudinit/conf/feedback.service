@@ -1,0 +1,19 @@
+# from https://maslosoft.com/blog/2019/07/10/running-php-script-as-a-system-service-in-ubuntu/
+[Unit]
+Description=PDF Creator API Service
+
+[Service]
+User=pdfcreator
+Type=simple
+TimeoutSec=3
+ExecStart=cd /home/pdfcreator/app/ && RUST_LOG=info ./pdfcreator > logs/app.log
+KillMode=process
+
+Environment=APP_PORT=8081
+Environment=APP_HOST=localhost
+
+Restart=on-failure
+RestartSec=42s
+
+[Install]
+WantedBy=default.target

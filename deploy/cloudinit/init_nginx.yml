@@ -1,0 +1,106 @@
+#cloud-config
+apt_update: true
+apt_upgrade: true
+users:
+  - name: root
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDHpkG2+2fEuUtk6JaFUKa+7C0q0Mu7rd96H+tVdUKQXx3eCpWy7VueT7WWbtKFfmhlbDUzWIe8Vk59ch1K1MxPMrRKFCHo98fbbLYcKBZ1jJcKLGCSZEPN0ckxKhDH7Wya799+QkZl9axgqqbexwsKDixcpIh5AVF29uU1hgUiOYoUkYNxROcYtnXJ7kXM446aRC4ibUT5Rdp9Op64A5QgPWPgAPW+gSSJmyblyRPwbhTGjawRsTk8mEnFoDdEnRkmBTlLcFIhUDnQ9DXLPO+mFTVADbgEBPaI5UDvX1RZCgK5w5dg+eIW1l2SHI+5ffocbYPMjS6qet+Nj57Uq3sf benedikt@benedikt-700Z3A
+  - name: gseonlineadmin
+    groups: users, admin
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDHpkG2+2fEuUtk6JaFUKa+7C0q0Mu7rd96H+tVdUKQXx3eCpWy7VueT7WWbtKFfmhlbDUzWIe8Vk59ch1K1MxPMrRKFCHo98fbbLYcKBZ1jJcKLGCSZEPN0ckxKhDH7Wya799+QkZl9axgqqbexwsKDixcpIh5AVF29uU1hgUiOYoUkYNxROcYtnXJ7kXM446aRC4ibUT5Rdp9Op64A5QgPWPgAPW+gSSJmyblyRPwbhTGjawRsTk8mEnFoDdEnRkmBTlLcFIhUDnQ9DXLPO+mFTVADbgEBPaI5UDvX1RZCgK5w5dg+eIW1l2SHI+5ffocbYPMjS6qet+Nj57Uq3sf benedikt@benedikt-700Z3A
+  - name: gseonlineweb
+    groups: users, www-data
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCywAJ00GHlLU5Z4AdUuzEx72DqArIQkGxCRPodviYFbpOywf+4JL09Bx5TKFTs2YVTVqFNC9pQIGima1Sw1fhQWtiPYvyXmJjZOQTDIOiOlgKmsHgzw91FnkVqsDtVaReVK1P+P5qFTz1QIOXPDy1S0vbxidrQ65K+6n5XF0hJNAlmfX5BlSPVgLmRFxVeNXr8O6ywneY6xAHjGqEDQVqxlLBauzSjINt6+GHyNj2+nlPc7OjCmKPGzof9hi9IOpR2AHbWL2wGXqGnEr0totykcYl5L0St+R7VhOvNggrTySFlPHl9c2l/Cai1H6qphASxwq9zAdkxXOCYWFYzdpJZEMenRb4hmg5h0fy/xIW5RGyuiSp81egvYXrfJx9YSH5DiiytFS/AziMi3XyJsF1WTOEAYQOKByp1Cn01TpvKXqbc4IM1xd8AIbiwkVrX+Nzy4xLJ/nb+ghhd+lKHhR+5BYnX53W1om+Z1Dw98NZhVfJMJvqvPt0vCq211p+kQPN2UCMYAYxnE1sZPyRiQZt0AzcLO/o9S34v8hIWNaIHvYjhepJW+7ChrwkFsuG9xhDnJTfzseEUTuZJcq1ervhLCFp0Cm3Sf/EuDh1QaFc8dkWY+XthX7O43LVOKgCdjZh/qTdheQtraQTYMbTWjph0XBFi0rl+OOPt8vfZ67AraQ== gseonlinedeploy@bgrande.de
+  - name: pdfcreator
+    groups: users
+    sudo: ALL=(ALL) NOPASSWD:/bin/systemctl * pdfcreator
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCywAJ00GHlLU5Z4AdUuzEx72DqArIQkGxCRPodviYFbpOywf+4JL09Bx5TKFTs2YVTVqFNC9pQIGima1Sw1fhQWtiPYvyXmJjZOQTDIOiOlgKmsHgzw91FnkVqsDtVaReVK1P+P5qFTz1QIOXPDy1S0vbxidrQ65K+6n5XF0hJNAlmfX5BlSPVgLmRFxVeNXr8O6ywneY6xAHjGqEDQVqxlLBauzSjINt6+GHyNj2+nlPc7OjCmKPGzof9hi9IOpR2AHbWL2wGXqGnEr0totykcYl5L0St+R7VhOvNggrTySFlPHl9c2l/Cai1H6qphASxwq9zAdkxXOCYWFYzdpJZEMenRb4hmg5h0fy/xIW5RGyuiSp81egvYXrfJx9YSH5DiiytFS/AziMi3XyJsF1WTOEAYQOKByp1Cn01TpvKXqbc4IM1xd8AIbiwkVrX+Nzy4xLJ/nb+ghhd+lKHhR+5BYnX53W1om+Z1Dw98NZhVfJMJvqvPt0vCq211p+kQPN2UCMYAYxnE1sZPyRiQZt0AzcLO/o9S34v8hIWNaIHvYjhepJW+7ChrwkFsuG9xhDnJTfzseEUTuZJcq1ervhLCFp0Cm3Sf/EuDh1QaFc8dkWY+XthX7O43LVOKgCdjZh/qTdheQtraQTYMbTWjph0XBFi0rl+OOPt8vfZ67AraQ== gseonlinedeploy@bgrande.de
+environment: "prod"
+write_files:
+  - content: |
+      [Unit]
+      Description=PDF Creator API Service
+    
+      [Service]
+      User=pdfcreator
+      Type=simple
+      TimeoutSec=3
+      ExecStart=cd /home/pdfcreator/app/ && RUST_LOG=info ./pdfcreator > logs/app.log 
+      KillMode=process
+        
+      Environment=APP_PORT=8081
+      Environment=APP_HOST=localhost
+    
+      Restart=on-failure
+      RestartSec=42s
+      
+      [Install]
+      WantedBy=default.target
+    path: /etc/systemd/system/pdfcreator.service
+  - content: |
+      gzip_vary on;
+      gzip_proxied any;
+      gzip_comp_level 6;
+      gzip_min_length 256;
+      gzip_buffers 16 8k;
+      gzip_http_version 1.1;
+      gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript application/atom+xml application/ld+json application/manifest+json application/rss+xml application/vnd.geo+json application/vnd.ms-fontobject application/x-font-ttf application/x-web-app-manifest+json application/xhtml+xml font/opentype image/bmp image/svg+xml image/x-icon text/cache-manifest text/vcard text/vnd.rim.location.xloc text/vtt text/x-component text/x-cross-domain-policy;
+      gzip_disable "MSIE [1-6]\.";
+    path: /etc/nginx/conf.d/compression.conf
+  - content: |
+      location ^~ /.well-known/acme-challenge/ {
+        allow all;
+        root /var/lib/letsencrypt/;
+        default_type "text/plain";
+        try_files $uri =404;
+      }
+    path: /etc/nginx/snippets/well-known
+runcmd:
+  - apt-get update && apt-get upgrade -y
+  - add-apt-repository universe
+  - apt-get update
+  - apt-get install -y lsb-release ca-certificates apt-transport-https software-properties-common
+  - add-apt-repository -y ppa:ondrej/nginx-mainline
+  - apt-get install -y fail2ban
+  - apt-get install -y certbot python3-certbot-nginx
+  - apt-get install -y nginx
+  - bash /usr/src/install-node.sh
+  - apt-get install -y nodejs
+  - printf "[sshd]\nenabled = true\nbanaction = iptables-multiport" > /etc/fail2ban/jail.local
+  - systemctl enable fail2ban
+  - ufw allow OpenSSH
+  - ufw allow ssh
+  - ufw allow 'Nginx HTTP'
+  - ufw allow 'Nginx HTTPS'
+  - ufw enable
+  - sed -i -e '/^\(#\|\)PermitRootLogin/s/^.*$/PermitRootLogin no/' /etc/ssh/sshd_config
+  - sed -i -e '/^\(#\|\)PasswordAuthentication/s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config
+  - sed -i -e '/^\(#\|\)X11Forwarding/s/^.*$/X11Forwarding no/' /etc/ssh/sshd_config
+  - sed -i -e '/^\(#\|\)MaxAuthTries/s/^.*$/MaxAuthTries 2/' /etc/ssh/sshd_config
+  - sed -i -e '/^\(#\|\)AllowTcpForwarding/s/^.*$/AllowTcpForwarding no/' /etc/ssh/sshd_config
+  - sed -i -e '/^\(#\|\)AllowAgentForwarding/s/^.*$/AllowAgentForwarding no/' /etc/ssh/sshd_config
+  - sed -i -e '/^\(#\|\)AuthorizedKeysFile/s/^.*$/AuthorizedKeysFile .ssh/authorized_keys/' /etc/ssh/sshd_config
+  - sed -i '$a AllowUsers gseonlineadmin gseonlineweb pdfcreator' /etc/ssh/sshd_config
+  - mkdir -p /var/www/gseonlineweb
+  - phpenmod -s fpm mbstring
+  - phpenmod -s fpm imagick
+  - phpenmod -s fpm curl
+  - phpenmod -s fpm json
+  - phpenmod -s fpm fileinfo
+  - phpenmod -s fpm exif
+  - phpenmod -s fpm xml
+  - phpenmod -s fpm openswoole
+  - phpenmod -s fpm dom
+  - phpenmod -s fpm zip
+  - phpenmod -s fpm opcache
+  - phpenmod -s fpm mbstring
+  - chown gseonlineweb.www-data /var/www/gseonlineweb
+  - echo "deploy-hook = systemctl reload nginx" >> /etc/letsencrypt/cli.ini
+  - reboot
