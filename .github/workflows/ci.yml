@@ -1,0 +1,48 @@
+name: CI
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+env:
+  TARGET_DIR: "app"
+jobs:
+  build_log:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: prepare build
+        run: mkdir -p build/data build/logs
+
+      - name: config
+        run: cat ${{ secrets.ENV }} > build/.env
+
+      - name: test
+        run: cargo test
+
+      - name: build
+        run: OPENSSL_STATIC=yes OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu OPENSSL_INCLUDE_DIR=/usr/include/ cargo build -r
+
+      - name: prepare deployment
+        run: |
+          cp target/release/pdf-creator-shuttle build/pdfcreator
+          cp -r data/db data/templates build/data/
+
+      # from https://github.com/marketplace/actions/action-rsync
+      - name: Deploy 🚀
+        uses: "up9cloud/action-rsync@v1.1"
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          KEY: ${{ secrets.DEPLOY_KEY }}
+          TARGET: ${{ secrets.DEPLOY_PATH }}
+          VERBOSE: true
+          USER: ${{ secrets.DEPLOY_USER }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          ARGS: -avzr --delete --exclude=".git" --exclude="data/diedaten" --exclude="docker-compose.yml" --exclude="Dockerfile" --exclude=".gitignore" --exclude=".dockerignore" --exclude=".github" --include="" --filter=""
+          SOURCE: ./build
+          POST_SCRIPT: |
+            sudo /bin/systemctl restart pdfcreator

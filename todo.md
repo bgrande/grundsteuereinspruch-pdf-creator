@@ -12,6 +12,7 @@
 + split functions into separate files and modules
 + main endpoint for separate application
 - use logging instead of tracing (with error!, debug!, ...)
+  -> https://docs.rs/env_logger/latest/env_logger/
 - Einspruchtemplate tests
 - Einspruchtemplate multiple pages
 - collision check for file_id folder -> if already existing, try again (until no collision) -> preventing accidental override and data leaking

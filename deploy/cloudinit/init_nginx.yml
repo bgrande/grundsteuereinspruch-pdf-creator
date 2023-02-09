@@ -32,9 +32,11 @@ write_files:
       User=pdfcreator
       Type=simple
       TimeoutSec=3
-      ExecStart=cd /home/pdfcreator/app/ && RUST_LOG=info ./pdfcreator > logs/app.log 
+      WorkingDirectory=/home/pdfcreator/app
+      ExecStart=pdfcreator > logs/app.log
       KillMode=process
-        
+      
+      Environment=RUST_LOG=info
       Environment=APP_PORT=8081
       Environment=APP_HOST=localhost
     
@@ -66,13 +68,11 @@ runcmd:
   - apt-get update && apt-get upgrade -y
   - add-apt-repository universe
   - apt-get update
-  - apt-get install -y lsb-release ca-certificates apt-transport-https software-properties-common
+  - apt-get install -y lsb-release ca-certificates apt-transport-https software-properties-common libssl-dev
   - add-apt-repository -y ppa:ondrej/nginx-mainline
   - apt-get install -y fail2ban
   - apt-get install -y certbot python3-certbot-nginx
   - apt-get install -y nginx
-  - bash /usr/src/install-node.sh
-  - apt-get install -y nodejs
   - printf "[sshd]\nenabled = true\nbanaction = iptables-multiport" > /etc/fail2ban/jail.local
   - systemctl enable fail2ban
   - ufw allow OpenSSH
@@ -89,6 +89,7 @@ runcmd:
   - sed -i -e '/^\(#\|\)AuthorizedKeysFile/s/^.*$/AuthorizedKeysFile .ssh/authorized_keys/' /etc/ssh/sshd_config
   - sed -i '$a AllowUsers gseonlineadmin gseonlineweb pdfcreator' /etc/ssh/sshd_config
   - mkdir -p /var/www/gseonlineweb
+  - mkdir -p /home/pdfcreator/app && chown pdfcreator.pdfcreator /home/pdfcreator/app
   - phpenmod -s fpm mbstring
   - phpenmod -s fpm imagick
   - phpenmod -s fpm curl
@@ -103,4 +104,6 @@ runcmd:
   - phpenmod -s fpm mbstring
   - chown gseonlineweb.www-data /var/www/gseonlineweb
   - echo "deploy-hook = systemctl reload nginx" >> /etc/letsencrypt/cli.ini
+  - ln -s /usr/lib/x86_64-linux-gnu/libssl.so /usr/lib/x86_64-linux-gnu/libssl.so.1.1
+  - ln -s /usr/lib/x86_64-linux-gnu/libcrypto.so /usr/lib/x86_64-linux-gnu/libcrypto.so.1.1
   - reboot

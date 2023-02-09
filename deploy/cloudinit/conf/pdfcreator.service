@@ -6,9 +6,11 @@ Description=PDF Creator API Service
 User=pdfcreator
 Type=simple
 TimeoutSec=3
-ExecStart=cd /home/pdfcreator/app/ && RUST_LOG=info ./pdfcreator > logs/app.log
+WorkingDirectory=/home/pdfcreator/app
+ExecStart=pdfcreator > logs/app.log
 KillMode=process
 
+Environment=RUST_LOG=info
 Environment=APP_PORT=8081
 Environment=APP_HOST=localhost
 

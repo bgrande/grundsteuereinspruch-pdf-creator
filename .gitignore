@@ -20,8 +20,10 @@ data/json/*
 /Cargo.lock
 
 # app
+build/*
 test
 .env
+.env.prod
 data/diedaten
 Secrets.toml
 *_bak*
