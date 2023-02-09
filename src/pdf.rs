@@ -1,7 +1,5 @@
-use std::fs;
 use html2pdf::{run, CliOptions, Error as H2PError};
 use structopt::StructOpt;
-use tokio::fs::File;
 use tracing::info;
 
 use crate::config::TEMPLATE_NAME_LETTER;
