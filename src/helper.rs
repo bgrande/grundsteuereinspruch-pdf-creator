@@ -5,7 +5,7 @@ use chrono::{Locale, LocalResult, NaiveDateTime, Utc};
 use chrono::LocalResult::Single;
 use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use log::{error, info};
 
 use crate::form::QuestionResult;
 use crate::config::FORM_ID;
@@ -36,7 +36,7 @@ pub fn get_date_from_micro(date: &str) -> Option<NaiveDateTime> {
     let sent_date_time = match sent {
         Ok(date_time) => date_time,
         Err(e) => {
-            info!("date conversion issue: {}", e.to_string());
+            error!("date conversion issue: {}", e.to_string());
             return None;
         },
     };
@@ -65,10 +65,6 @@ pub fn is_valid_payload(payload: &QuestionResult) -> bool {
 
 pub fn get_sender_object(base_path: &str, file_name: &str) -> AnyResult<Sender> {
     let file_path = format!("{}/{}", base_path, file_name);
-
-    // todo: remove this logging
-    info!("sender data file path: {}", file_path);
-
     let data = fs::read_to_string(file_path);
     let data_string = data?;
     let sender: Sender = serde_json::from_str(data_string.as_str())?;
@@ -90,11 +86,11 @@ pub fn get_formatted_date_from_string(date: String, format: &str) -> AnyResult<S
     return Ok(match utc_naive_date {
         Single(date_time) => date_time.format_localized(format, Locale::de_DE).to_string(),
         LocalResult::Ambiguous(_, _) => {
-            info!("date conversion issue: ambiguous");
+            error!("date conversion issue: ambiguous");
             "".to_string()
         },
         LocalResult::None => {
-            info!("date conversion issue: not existing");
+            error!("date conversion issue: not existing");
             "".to_string()
         },
     });

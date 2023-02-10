@@ -1,6 +1,6 @@
 use html2pdf::{run, CliOptions, Error as H2PError};
 use structopt::StructOpt;
-use tracing::info;
+use log::{error};
 
 use crate::config::TEMPLATE_NAME_LETTER;
 use crate::config::TEMPLATE_NAME_INVOICE;
@@ -17,7 +17,7 @@ pub fn create_pdf_by_id(base_path: String) -> Option<bool> {
     ) {
         Ok(result) => result,
         Err(e) => {
-            info!("sth. went wrong creating the pdf for the letter: {}", e.to_string());
+            error!("sth. went wrong creating the pdf for the letter: {}", e);
             return None
         },
     };
@@ -28,7 +28,7 @@ pub fn create_pdf_by_id(base_path: String) -> Option<bool> {
     ) {
         Ok(result) => result,
         Err(e) => {
-            info!("sth. went wrong creating the pdf for the invoice: {}", e.to_string());
+            error!("sth. went wrong creating the pdf for the invoice: {}", e);
             return None
         },
     };
@@ -39,7 +39,7 @@ pub fn create_pdf_by_id(base_path: String) -> Option<bool> {
     ) {
         Ok(result) => result,
         Err(e) => {
-            info!("sth. went wrong creating the pdf for the tipps: {}", e.to_string());
+            error!("sth. went wrong creating the pdf for the tipps: {}", e);
             return None
         },
     };

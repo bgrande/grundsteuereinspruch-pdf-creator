@@ -4,7 +4,7 @@ use lettre::{Message, SmtpTransport, Transport};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use lettre::message::header::{ContentTransferEncoding, ContentType};
-use tracing::info;
+use log::{error, info};
 
 use crate::objects::Letter;
 
@@ -76,7 +76,7 @@ mail@grundsteuereinspruch.online
             info!("Email sent successfully!");
         }
         Err(e) => {
-            info!("Could not send email: {:?}", e);
+            error!("Could not send email: {:?}", e);
         }
     }
 

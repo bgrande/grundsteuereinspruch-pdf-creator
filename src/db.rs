@@ -1,7 +1,7 @@
 use anyhow::Result as AnyResult;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::FromRow;
-use tracing::info;
+use log::info;
 
 #[derive(FromRow, Debug)]
 pub struct TaxOffice {

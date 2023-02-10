@@ -21,7 +21,7 @@ data/json/*
 
 # app
 build/*
-test
+test/rust
 .env
 .env.prod
 data/diedaten

@@ -10,7 +10,7 @@ use axum::response::{IntoResponse, AppendHeaders};
 use chrono::{Duration, LocalResult, Utc};
 use chrono::LocalResult::Single;
 use chrono::prelude::*;
-use tracing::info;
+use log::{debug, error, info, warn};
 use tokio_util::io::ReaderStream;
 
 use crate::crypt::*;
@@ -77,7 +77,7 @@ pub async fn create_html(
     let file_id = match create_random_id() {
         Ok(id) => id,
         Err(e) =>  {
-            info!("Brieferstellung, id creation: {}", e.to_string());
+            error!("Brieferstellung, id creation: {}", e);
             return "Etwas lief schief beim Erstellen des Briefs (1).";
             // todo add kontakt-link (use error template)
         }
@@ -86,7 +86,7 @@ pub async fn create_html(
     let base_path = match create_path(file_id.clone(), TARGET_PATH.to_string()) {
         Ok(path) => path,
         Err(e) => {
-            info!("Brieferstellung, path creation: {}", e.to_string());
+            error!("Brieferstellung, path creation: {}", e);
             return "Etwas lief schief beim Erstellen des Briefs (1).";
             // todo add kontakt-link (use error template)
         }
@@ -97,14 +97,14 @@ pub async fn create_html(
     let payload_string = match serde_json::to_string_pretty(&payload) {
         Ok(index) => index,
         Err(e) => {
-            info!("error creating json for the payload for file_id {}: {}", file_id, e.to_string());
+            error!("error creating json for the payload for file_id {}: {}", file_id, e);
             "".to_string()
         },
     };
 
     match fs::write(payload_json_path, payload_string) {
         Ok(_) => {},
-        Err(e) => info!("error writing json for the payload for file_id {}: {}", file_id, e.to_string()),
+        Err(e) => error!("error writing json for the payload for file_id {}: {}", file_id, e),
     }
 
     let is_payload_valid = is_valid_payload(&payload);
@@ -117,7 +117,7 @@ pub async fn create_html(
     let sender = match get_sender_object(DB_PATH, SENDER_JSON) {
         Ok(object) => object,
         Err(e) => {
-            info!("error getting the sender data: {}", e.to_string());
+            error!("error getting the sender data: {}", e);
             return "Etwas ging schief bei der Brieferstellung (ß)";
         }
     };
@@ -380,7 +380,7 @@ pub async fn create_html(
             let tax_office_sent_date_val = match sent_date_chrono {
                 Ok(date_time) => date_time,
                 Err(e) => {
-                    info!("date conversion issue: {}", e);
+                    error!("date conversion issue: {}", e);
                     return "Das Datum des Bescheidbriefes ist falsch"
                 },
             };
@@ -390,11 +390,11 @@ pub async fn create_html(
             let formatted_sent_date = match utc_sent_date {
                 Single(date_time) => date_time.format_localized("%d.%m.%Y", Locale::de_DE).to_string(),
                 LocalResult::Ambiguous(_, _) => {
-                    info!("date conversion issue: ambiguous");
+                    error!("date conversion issue: ambiguous");
                     "".to_string()
                 },
                 LocalResult::None => {
-                    info!("date conversion issue: not existing");
+                    error!("date conversion issue: not existing");
                     "".to_string()
                 },
             };
@@ -402,7 +402,7 @@ pub async fn create_html(
             let deadline_date = match sent_date_chrono {
                 Ok(date_time) => date_time + Duration::weeks(4),
                 Err(e) => {
-                    info!("date conversion issue: {}", e);
+                    error!("date conversion issue: {}", e);
                     return "Das Datum des Bescheidbriefes ist falsch"
                 },
             };
@@ -411,11 +411,11 @@ pub async fn create_html(
             let formatted_deadline = match utc_deadline {
                 Single(date_time) => date_time.format_localized("%e. %B %Y", Locale::de_DE).to_string(),
                 LocalResult::Ambiguous(_, _) => {
-                    info!("date conversion issue: ambiguous");
+                    error!("date conversion issue: ambiguous");
                     "".to_string()
                 },
                 LocalResult::None => {
-                    info!("date conversion issue: not existing");
+                    error!("date conversion issue: not existing");
                     "".to_string()
                 },
             };
@@ -453,7 +453,7 @@ pub async fn create_html(
         {
             letter
                 .objection_subjects
-                .push("Grundsteuerwertbescheid".to_string());
+                .push("Grundsteuerwert".to_string());
         }
         // this is Einspruch für Grundsteuermessbescheid
         if field.key == "question_nWjbDJ_73a81f7f-2dbe-4fcd-9573-38f98596049f"
@@ -461,7 +461,7 @@ pub async fn create_html(
         {
             letter
                 .objection_subjects
-                .push("Grundsteuermessbescheid".to_string());
+                .push("Grundsteuermessbetrag".to_string());
         }
         // this is Einspruch für Grundsteuerwertbescheid
         if field.key == "question_w8Rgel" && !check_val.to_owned().is_empty() {
@@ -537,21 +537,22 @@ pub async fn create_html(
     let tax_office_address_object = match tax_office_address.await {
         Ok(address) => address,
         Err(e) => {
-            info!("sth. went wrong getting the tax office address: {}", e);
+            error!("sth. went wrong getting the tax office address: {}", e);
             return "Die angegebenen Finanzamtdaten waren vermutlich fehlerhaft. Das Finanzamt konnte nicht in unserer Datenbank gefunden werden.";
         }
     };
 
     info!("tax office address: {:?}", tax_office_address_object);
+
     letter.receiver_office_name = tax_office_address_object.name;
     letter.receiver_office_zip = tax_office_address_object.zip;
     letter.receiver_office_city = tax_office_address_object.city;
     letter.receiver_office_address = format!("{} {}", tax_office_address_object.street, tax_office_address_object.number);
 
-    info!("start_now: {:?}", &meta_start_now);
-    info!("no_warranty: {:?}", &meta_no_warranty);
-    info!("origin_page: {:?}", &meta_origin_page);
-    info!("token: {:?}", &meta_token);
+    debug!("start_now: {:?}", &meta_start_now);
+    debug!("no_warranty: {:?}", &meta_no_warranty);
+    debug!("origin_page: {:?}", &meta_origin_page);
+    debug!("token: {:?}", &meta_token);
 
     if meta_start_now.value.parse() == Ok(false) || meta_no_revocation.value.parse() == Ok(false) {
         return "Die Zustimmung zur Ausführung des Vertrags vor Ablauf der Widerrufsfrist und/oder den Verlust des Widerrufsrechts dadurch fehlt.";
@@ -568,7 +569,7 @@ pub async fn create_html(
     let mapping_base_path = match create_path(mapping_hash.to_string(), MAPPING_PATH.to_string()) {
         Ok(path) => path,
         Err(e) => {
-            info!("Brieferstellung, path creation: {}", e.to_string());
+            error!("Brieferstellung, path creation: {}", e);
             return "Etwas lief schief beim Erstellen des Briefs (1).";
             // todo add kontakt-link (use error template)
         }
@@ -589,13 +590,13 @@ pub async fn create_html(
     let mapping_result = match TEMPLATES.render(TEMPLATE_NAME_MAPPING, &mapping_context) {
         Ok(result) => result,
         Err(e) => {
-            info!("Mapping redirect, template rendering: {}", e.to_string());
+            error!("Mapping redirect, template rendering: {}", e.to_string());
             return "Etwas ging schief beim Erstellen des Briefs (0).";
         }
     };
     match fs::write(mapping_path, mapping_result) {
         Ok(_) => {},
-        Err(_) => info!("Mapping redirect creation failed.")
+        Err(_) => error!("Mapping redirect creation failed.")
     }
 
     invoice.customer_id = generate_customer_id(&letter.first_name, &letter.last_name, &letter.email);
@@ -609,7 +610,7 @@ pub async fn create_html(
     let letter_context = match Context::from_serialize(&letter) {
         Ok(context) => context,
         Err(e) => {
-            info!("Brieferstellung, context serializing: {}", e.to_string());
+            error!("Brieferstellung, context serializing: {}", e.to_string());
             return "Etwas ging schief beim Erstellen des Briefs (2).";
         }
     };
@@ -617,20 +618,20 @@ pub async fn create_html(
     let letter_result = match TEMPLATES.render(TEMPLATE_NAME_LETTER, &letter_context) {
         Ok(result) => result,
         Err(e) => {
-            info!("Brieferstellung, template rendering: {}", e.to_string());
+            error!("Brieferstellung, template rendering: {}", e.to_string());
             return "Etwas ging schief beim Erstellen des Briefs (3).";
         }
     };
 
     match fs::write(letter_path, letter_result) {
         Ok(_) => {},
-        Err(_) => info!("Etwas ging schief beim Erstellen des Briefs (3).")
+        Err(_) => error!("Etwas ging schief beim Erstellen des Briefs (3).")
     }
 
     let invoice_context = match Context::from_serialize(&invoice) {
         Ok(result) => result,
         Err(e) => {
-            info!("Rechnung, context serializing: {}", e.to_string());
+            error!("Rechnung, context serializing: {}", e.to_string());
             return "Etwas ging schief beim Erstellen der Rechnung (1).";
         }
     };
@@ -638,20 +639,20 @@ pub async fn create_html(
     let invoice_result = match TEMPLATES.render(TEMPLATE_NAME_INVOICE, &invoice_context) {
         Ok(result) => result,
         Err(e) => {
-            info!("Rechnung, template rendering: {}", e.to_string());
+            error!("Rechnung, template rendering: {}", e.to_string());
             return "Etwas ging schief beim Erstellen der Rechnung (2).";
         }
     };
 
     match fs::write(invoice_path, invoice_result) {
         Ok(_) => {},
-        Err(_) => info!("Etwas ging schief beim Erstellen der Rechnung (3).")
+        Err(_) => error!("Etwas ging schief beim Erstellen der Rechnung (3).")
     }
 
     let index_context = match Context::from_serialize(&index) {
         Ok(result) => result,
         Err(e) => {
-            info!("Index, context serializing: {}", e.to_string());
+            error!("Index, context serializing: {}", e);
             return "Etwas ging schief beim Erstellen der Übersicht (1).";
         }
     };
@@ -659,20 +660,20 @@ pub async fn create_html(
     let index_result = match TEMPLATES.render(TEMPLATE_NAME_INDEX, &index_context) {
         Ok(result) => result,
         Err(e) => {
-            info!("Index, template rendering: {}", e.to_string());
+            error!("Index, template rendering: {}", e);
             return "Etwas ging schief beim Erstellen der Übersicht (2).";
         }
     };
 
     match fs::write(index_path, index_result) {
         Ok(_) => {},
-        Err(_) => info!("Etwas ging schief beim Erstellen der Übersicht (3).")
+        Err(e) => error!("Etwas ging schief beim Erstellen der Übersicht (3): {}.", e)
     }
 
     let list_context = match Context::from_serialize(&list) {
         Ok(result) => result,
         Err(e) => {
-            info!("List, context serializing: {}", e.to_string());
+            error!("List, context serializing: {}", e);
             return "Etwas ging schief beim Erstellen der Tipps (1)";
         }
     };
@@ -680,26 +681,29 @@ pub async fn create_html(
     let list_result = match TEMPLATES.render(TEMPLATE_NAME_LIST, &list_context) {
         Ok(result) => result,
         Err(e) => {
-            info!("List, template rendering: {}", e.to_string());
+            error!("List, template rendering: {}", e);
             return "Etwas ging schief beim Erstellen der Tipps (2)";
         }
     };
 
     match fs::write(list_path, list_result) {
         Ok(_) => {},
-        Err(_) => info!("Etwas ging schief beim Erstellen der Tipps (3).")
+        Err(e) => error!("Etwas ging schief beim Erstellen der Tipps (3): {}.", e)
     }
 
     let pdf_creation_result = match create_pdf_by_id(base_path) {
         // todo: redirect to index
         Some(_) => "success",
-        None => "Etwas ging schief beim Erstellen des PDFs",
+        None => {
+            error!("PDF creation failed for unknown reason");
+            "Etwas ging schief beim Erstellen des PDFs"
+        },
     };
 
     match send_email(&letter, link, get_email_config(state.email_user.clone(), state.email_pass.clone())) {
         // ok is just fine
         Ok(_) => {},
-        Err(e) => info!("unexpected error while sending email: {}", e)
+        Err(e) => error!("unexpected error while sending email: {}", e)
     };
 
     return pdf_creation_result;
@@ -719,7 +723,7 @@ pub async fn get_html(Path(params): Path<HashMap<String, String>>) -> axum::resp
 
     if !allowed_types.contains(&page) {
         // todo use error page
-        info!("trying to get page of type {} which doesn't exist.", &page);
+        warn!("trying to get page of type {} which doesn't exist.", &page);
         return "This page does not exist!".to_string().into();
     }
 
@@ -728,7 +732,7 @@ pub async fn get_html(Path(params): Path<HashMap<String, String>>) -> axum::resp
     return match page_result {
         Ok(result) => result.into(),
         Err(e) => {
-            info!("couldn't get page with name {}: {}", &name, e.to_string());
+            error!("couldn't get page with name {}: {}", &name, e);
             "The page does not exist!".to_string().into()
         }
     }

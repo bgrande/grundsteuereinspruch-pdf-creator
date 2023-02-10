@@ -16,7 +16,7 @@ mod routes;
 use axum::{routing::get, routing::post, Router, ServiceExt};
 
 use dotenv::dotenv;
-use tracing::{error, info};
+use log::{error, info};
 
 pub(crate) mod send;
 
@@ -27,6 +27,7 @@ use crate::routes::{AppState, create_html, create_pdf, get_html, get_pdf, get_re
 
 #[tokio::main]
 async fn main()  {
+    env_logger::init();
     dotenv().ok();
     /*let config = GovernorConfigBuilder::default()
     .per_second(4)
