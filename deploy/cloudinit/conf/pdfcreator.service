@@ -7,7 +7,7 @@ User=pdfcreator
 Type=simple
 TimeoutSec=3
 WorkingDirectory=/home/pdfcreator/app
-ExecStart=pdfcreator > logs/app.log
+ExecStart=/home/pdfcreator/app/pdfcreator > logs/app.log
 KillMode=process
 
 Environment=RUST_LOG=info
