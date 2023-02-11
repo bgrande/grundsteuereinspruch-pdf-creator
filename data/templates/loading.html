@@ -12,6 +12,7 @@
 
 	{% if additional_head %}{{head}}{% endif %}
 	<style> .external:before {content: "\1F855";padding-right: 6px;}</style>
+	<script>history.replaceState(stateObject, '', 'dashboard');</script>
 </head>
 <body>
 <header class="fixed w-full">
