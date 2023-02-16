@@ -36,7 +36,7 @@ pub fn get_date_from_micro(date: &str) -> Option<NaiveDateTime> {
     let sent_date_time = match sent {
         Ok(date_time) => date_time,
         Err(e) => {
-            error!("date conversion issue: {}", e.to_string());
+            error!("date conversion issue: {}", e);
             return None;
         },
     };
@@ -49,7 +49,10 @@ pub fn is_valid_payload(payload: &QuestionResult) -> bool {
 
     let sent_date_time = match date {
         Some(date_time) => date_time.timestamp(),
-        None => return false,
+        None => {
+            error!("Date check failed: payload invalid!");
+            return false
+        },
     };
 
     let now = Utc::now().timestamp();

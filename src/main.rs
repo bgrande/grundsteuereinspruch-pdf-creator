@@ -13,7 +13,7 @@ mod pdf;
 mod objects;
 mod routes;
 
-use axum::{routing::get, routing::post, Router, ServiceExt};
+use axum::{routing::get, routing::post, Router};
 
 use dotenv::dotenv;
 use log::{error, info};
@@ -60,6 +60,7 @@ async fn main()  {
 
     let router = Router::new()
         .route("/", get(hello))
+        .route("/test", get(hello))
         // todo: rate limit this request (only 240 per minute per IP)
         .route("/pdf/:id", post(create_pdf))
         // todo rate limit this request (only 240 per minute per IP)

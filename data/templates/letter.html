@@ -93,13 +93,13 @@
 				<p class="subject_text">
 					<b>
 						<span class="subject_title">Aktenzeichen/Steuernr: {{reference_number}}</span>
-						<span class="subject_content">{{subject_text}} {% for subj in objection_subjects %}{% if loop.index == 2 %} und {% endif %}{{subj}}{% endfor %}</span>
+						<span class="subject_content">{{subject_text}} {% for subj in objection_subjects %}{% if loop.index == 2 %} und {% endif %}{{subj}}s{% endfor %}</span>
 					</b>
 				</p>
 			</div>
 			<p class="title">Sehr geehrte Damen und Herren,</p>
 			<p>
-				gegen den o.g. Bescheid zum <i>{% for date in objection_subject_start_dates %}{% if loop.index == 2%} bzw. {% endif %}{{date}}{% endfor %}</i>
+				gegen den oben genannten Bescheid zum <i>{% for date in objection_subject_start_dates %}{% if loop.index == 2%} bzw. {% endif %}{{date}}{% endfor %}</i>
 				über die Feststellung des {% for subj in objection_subjects %}{% if loop.index == 2 %} und {% endif %}{{subj}}{% endfor %} vom {{sent_date}}
 				lege{% if additional_senders %}n wir{% else %} ich{% endif %} hiermit Einspruch ein.
 

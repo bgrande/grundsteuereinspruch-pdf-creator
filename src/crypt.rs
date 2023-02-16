@@ -36,6 +36,16 @@ pub fn get_mapping_hash(respondent: &str, submission: &str, email: &str) -> u64 
     calculate_hash(to_hash)
 }
 
+pub fn generate_error_id(error_msg: &str) -> String {
+    let hash_object = ToHash {
+        value: format!("{}{}", Utc::now().format("%Y%m%dH%M%S"), error_msg),
+    };
+
+    let hashed = calculate_hash(hash_object).to_string();
+
+    hashed
+}
+
 pub fn generate_customer_id(first_name: &String, last_name: &String, email: &String) -> String {
     let hash_object = ToHash {
         value: format!("{}{}{}{}", Utc::now().format("%Y%m%dH%M%S"), first_name, last_name, email),

@@ -73,13 +73,15 @@ pub async fn create_pdf(Path(params): Path<HashMap<String, String>>) -> &'static
 pub async fn create_html(
     State(state): State<Arc<AppState>>,
     extract::Json(payload): extract::Json<QuestionResult>
-) -> &'static str  {
+) -> impl IntoResponse  {
+    let headers = [(header::CONTENT_TYPE, "text/html")];
+
     let file_id = match create_random_id() {
         Ok(id) => id,
         Err(e) =>  {
             error!("Brieferstellung, id creation: {}", e);
-            return "Etwas lief schief beim Erstellen des Briefs (1).";
-            // todo add kontakt-link (use error template)
+            let string = get_error_page("Etwas lief schief beim Erstellen des Briefs (id).");
+            return (StatusCode::BAD_REQUEST, headers, string)
         }
     };
 
@@ -87,8 +89,7 @@ pub async fn create_html(
         Ok(path) => path,
         Err(e) => {
             error!("Brieferstellung, path creation: {}", e);
-            return "Etwas lief schief beim Erstellen des Briefs (1).";
-            // todo add kontakt-link (use error template)
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen des Briefs (base_path)."));
         }
     };
 
@@ -110,15 +111,16 @@ pub async fn create_html(
     let is_payload_valid = is_valid_payload(&payload);
 
     if !is_payload_valid {
-        // todo activate and test this check
-        //return "The payload sent is invalid";
+        // todo test this!
+        error!("Payload was invalid!");
+        return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen des Briefs (payload)."));
     }
 
     let sender = match get_sender_object(DB_PATH, SENDER_JSON) {
         Ok(object) => object,
         Err(e) => {
             error!("error getting the sender data: {}", e);
-            return "Etwas ging schief bei der Brieferstellung (ß)";
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen des Briefs (sender_data)."));
         }
     };
 
@@ -234,8 +236,6 @@ pub async fn create_html(
         key: "".to_string(),
         value: "".to_string(),
     };
-
-    // todo write the whole payload into JSON?
 
     for field in payload.data.fields {
         let value = field.value.to_owned();
@@ -381,7 +381,7 @@ pub async fn create_html(
                 Ok(date_time) => date_time,
                 Err(e) => {
                     error!("date conversion issue: {}", e);
-                    return "Das Datum des Bescheidbriefes ist falsch"
+                    return (StatusCode::BAD_REQUEST, headers, get_error_page("Das Datum des Bescheidbriefes ist falsch."));
                 },
             };
 
@@ -403,7 +403,7 @@ pub async fn create_html(
                 Ok(date_time) => date_time + Duration::weeks(4),
                 Err(e) => {
                     error!("date conversion issue: {}", e);
-                    return "Das Datum des Bescheidbriefes ist falsch"
+                    return (StatusCode::BAD_REQUEST, headers, get_error_page("Das Datum des Bescheidbriefes ist falsch. (deadline)"));
                 },
             };
 
@@ -538,7 +538,7 @@ pub async fn create_html(
         Ok(address) => address,
         Err(e) => {
             error!("sth. went wrong getting the tax office address: {}", e);
-            return "Die angegebenen Finanzamtdaten waren vermutlich fehlerhaft. Das Finanzamt konnte nicht in unserer Datenbank gefunden werden.";
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Die angegebenen Finanzamtdaten waren vermutlich fehlerhaft. Das Finanzamt konnte nicht in unserer Datenbank gefunden werden."));
         }
     };
 
@@ -555,13 +555,16 @@ pub async fn create_html(
     debug!("token: {:?}", &meta_token);
 
     if meta_start_now.value.parse() == Ok(false) || meta_no_revocation.value.parse() == Ok(false) {
-        return "Die Zustimmung zur Ausführung des Vertrags vor Ablauf der Widerrufsfrist und/oder den Verlust des Widerrufsrechts dadurch fehlt.";
+        error!("Missing revocation acceptance.");
+        return (StatusCode::BAD_REQUEST, headers, get_error_page("Die Zustimmung zur Ausführung des Vertrags vor Ablauf der Widerrufsfrist und/oder den Verlust des Widerrufsrechts dadurch fehlt."));
     }
     if meta_no_warranty.value.parse() == Ok(false) {
-        return "Es fehlt die Zustimmung zum Garantieausschluss";
+        error!("Missing warranty acceptance.");
+        return (StatusCode::BAD_REQUEST, headers, get_error_page("Es fehlt die Zustimmung zum Garantieausschluss."));
     }
     if meta_origin_page.value != "/fragebogen.html" || meta_token.value != APP_TOKEN {
-        return "Der Aufruf war fehlerhaft!";
+        error!("There might have been a tempered call from origin {} and with token {}.", meta_origin_page.value, meta_token.value);
+        return (StatusCode::BAD_REQUEST, headers, get_error_page("Der Aufruf war fehlerhaft!"));
     }
 
     let mapping_hash = get_mapping_hash(payload.data.respondent_id.as_str(), payload.data.submission_id.as_str(), letter.email.as_str());
@@ -570,8 +573,7 @@ pub async fn create_html(
         Ok(path) => path,
         Err(e) => {
             error!("Brieferstellung, path creation: {}", e);
-            return "Etwas lief schief beim Erstellen des Briefs (1).";
-            // todo add kontakt-link (use error template)
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen des Briefs (path)."));
         }
     };
 
@@ -590,13 +592,16 @@ pub async fn create_html(
     let mapping_result = match TEMPLATES.render(TEMPLATE_NAME_MAPPING, &mapping_context) {
         Ok(result) => result,
         Err(e) => {
-            error!("Mapping redirect, template rendering: {}", e.to_string());
-            return "Etwas ging schief beim Erstellen des Briefs (0).";
+            error!("Mapping redirect, template rendering: {}", e);
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen des Briefs (redirect_render)."));
         }
     };
     match fs::write(mapping_path, mapping_result) {
         Ok(_) => {},
-        Err(_) => error!("Mapping redirect creation failed.")
+        Err(e) => {
+            error!("Mapping redirect creation failed: {}", e);
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen des Briefs (redirect_mapping)."));
+        }
     }
 
     invoice.customer_id = generate_customer_id(&letter.first_name, &letter.last_name, &letter.email);
@@ -610,50 +615,56 @@ pub async fn create_html(
     let letter_context = match Context::from_serialize(&letter) {
         Ok(context) => context,
         Err(e) => {
-            error!("Brieferstellung, context serializing: {}", e.to_string());
-            return "Etwas ging schief beim Erstellen des Briefs (2).";
+            error!("Brieferstellung, context serializing: {}", e);
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen des Briefs (context)."));
         }
     };
 
     let letter_result = match TEMPLATES.render(TEMPLATE_NAME_LETTER, &letter_context) {
         Ok(result) => result,
         Err(e) => {
-            error!("Brieferstellung, template rendering: {}", e.to_string());
-            return "Etwas ging schief beim Erstellen des Briefs (3).";
+            error!("Brieferstellung, template rendering: {}", e);
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen des Briefs (render)."));
         }
     };
 
     match fs::write(letter_path, letter_result) {
         Ok(_) => {},
-        Err(_) => error!("Etwas ging schief beim Erstellen des Briefs (3).")
+        Err(_) => {
+            error!("Etwas ging schief beim Erstellen des Briefs (3).");
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen des Briefs (write)."));
+        }
     }
 
     let invoice_context = match Context::from_serialize(&invoice) {
         Ok(result) => result,
         Err(e) => {
-            error!("Rechnung, context serializing: {}", e.to_string());
-            return "Etwas ging schief beim Erstellen der Rechnung (1).";
+            error!("Rechnung, context serializing: {}", e);
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen der Rechnung (context)."));
         }
     };
 
     let invoice_result = match TEMPLATES.render(TEMPLATE_NAME_INVOICE, &invoice_context) {
         Ok(result) => result,
         Err(e) => {
-            error!("Rechnung, template rendering: {}", e.to_string());
-            return "Etwas ging schief beim Erstellen der Rechnung (2).";
+            error!("Rechnung, template rendering: {}", e);
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen der Rechnung (render)."));
         }
     };
 
     match fs::write(invoice_path, invoice_result) {
         Ok(_) => {},
-        Err(_) => error!("Etwas ging schief beim Erstellen der Rechnung (3).")
+        Err(_) => {
+            error!("Etwas ging schief beim Erstellen der Rechnung (3).");
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen der Rechnung (write)."));
+        }
     }
 
     let index_context = match Context::from_serialize(&index) {
         Ok(result) => result,
         Err(e) => {
             error!("Index, context serializing: {}", e);
-            return "Etwas ging schief beim Erstellen der Übersicht (1).";
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen der Übersicht (context)."));
         }
     };
 
@@ -661,20 +672,23 @@ pub async fn create_html(
         Ok(result) => result,
         Err(e) => {
             error!("Index, template rendering: {}", e);
-            return "Etwas ging schief beim Erstellen der Übersicht (2).";
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen der Übersicht (render)."));
         }
     };
 
     match fs::write(index_path, index_result) {
         Ok(_) => {},
-        Err(e) => error!("Etwas ging schief beim Erstellen der Übersicht (3): {}.", e)
+        Err(e) => {
+            error!("Etwas ging schief beim Erstellen der Übersicht (3): {}.", e);
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen der Übersicht (write)."));
+        }
     }
 
     let list_context = match Context::from_serialize(&list) {
         Ok(result) => result,
         Err(e) => {
             error!("List, context serializing: {}", e);
-            return "Etwas ging schief beim Erstellen der Tipps (1)";
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen der Tipps (context)."));
         }
     };
 
@@ -682,21 +696,26 @@ pub async fn create_html(
         Ok(result) => result,
         Err(e) => {
             error!("List, template rendering: {}", e);
-            return "Etwas ging schief beim Erstellen der Tipps (2)";
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen der Tipps (render)."));
         }
     };
 
     match fs::write(list_path, list_result) {
         Ok(_) => {},
-        Err(e) => error!("Etwas ging schief beim Erstellen der Tipps (3): {}.", e)
+        Err(e) => {
+            error!("Etwas ging schief beim Erstellen der Tipps (3): {}.", e);
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas lief schief beim Erstellen der Tipps (write)."));
+        }
     }
 
+    let sleep_time = time::Duration::from_millis(1000);
+    thread::sleep(sleep_time);
+
     let pdf_creation_result = match create_pdf_by_id(base_path) {
-        // todo: redirect to index
-        Some(_) => "success",
+        Some(_) => "success".to_string(),
         None => {
             error!("PDF creation failed for unknown reason");
-            "Etwas ging schief beim Erstellen des PDFs"
+            return (StatusCode::BAD_REQUEST, headers, get_error_page("Etwas ging schief beim Erstellen des PDFs."));
         },
     };
 
@@ -706,10 +725,12 @@ pub async fn create_html(
         Err(e) => error!("unexpected error while sending email: {}", e)
     };
 
-    return pdf_creation_result;
+    return (StatusCode::OK, headers, pdf_creation_result);
 }
 
-pub async fn get_html(Path(params): Path<HashMap<String, String>>) -> axum::response::Html<String> {
+pub async fn get_html(Path(params): Path<HashMap<String, String>>) -> impl IntoResponse {
+    let headers = [(header::CONTENT_TYPE, "text/html")];
+
     let name = match params.get("id") {
         None => "",
         Some(val) => val.as_str(),
@@ -722,23 +743,24 @@ pub async fn get_html(Path(params): Path<HashMap<String, String>>) -> axum::resp
     let allowed_types = vec!["index"];
 
     if !allowed_types.contains(&page) {
-        // todo use error page
         warn!("trying to get page of type {} which doesn't exist.", &page);
-        return "This page does not exist!".to_string().into();
+        return Err((StatusCode::NOT_FOUND, headers, get_error_page("Diese Seite existiert nicht.")));
     }
 
     let page_result = get_html_page(name, page, TARGET_PATH);
 
     return match page_result {
-        Ok(result) => result.into(),
+        Ok(result) => Ok((StatusCode::OK, headers, result)),
         Err(e) => {
             error!("couldn't get page with name {}: {}", &name, e);
-            "The page does not exist!".to_string().into()
+            return Err((StatusCode::NOT_FOUND, headers, get_error_page("Diese Seite existiert nicht.")));
         }
     }
 }
 
-pub async fn get_result_page(Query(params): Query<HashMap<String, String>>) -> axum::response::Html<String> {
+pub async fn get_result_page(Query(params): Query<HashMap<String, String>>) -> impl IntoResponse {
+    let headers = [(header::CONTENT_TYPE, "text/html")];
+
     let email = match params.get("email") {
         None => "",
         Some(val) => val.as_str(),
@@ -765,10 +787,10 @@ pub async fn get_result_page(Query(params): Query<HashMap<String, String>>) -> a
     let page_result = get_html_page(name, &format!("{}/index", page.clone()), TARGET_PATH);
 
     return match page_result {
-        Ok(result) => result.into(),
+        Ok(result) => Ok((StatusCode::OK, headers, result)),
         Err(e) => {
-            info!("couldn't get page with name {}: {}", &name, e.to_string());
-            "The page does not exist!".to_string().into()
+            info!("couldn't get page with name {}: {}", &name, e);
+            return Err((StatusCode::NOT_FOUND, headers, get_error_page("Diese Seite existiert nicht.")));
         }
     }
 }
@@ -778,6 +800,8 @@ pub async fn hello() -> &'static str {
 }
 
 pub async fn get_pdf(Path(params): Path<HashMap<String, String>>) -> impl IntoResponse {
+    let headers = [(header::CONTENT_TYPE, "text/html")];
+
     let name = match params.get("id") {
         None => "",
         Some(val) => val.as_str(),
@@ -789,18 +813,9 @@ pub async fn get_pdf(Path(params): Path<HashMap<String, String>>) -> impl IntoRe
 
     let allowed_types = vec!["letter", "invoice"];
 
-    /*
-    let mut headers = AppendHeaders([
-        (header::CONTENT_TYPE, "text/html"),
-        (header::CONTENT_LANGUAGE, "Content-Language: de-DE"),
-    ]);
-    */
-
     if !allowed_types.contains(&page) {
-        // todo use error page
         info!("trying to get page of type {} which doesn't exist.", &page);
-        // todo: redirect to error page?
-        return Err((StatusCode::NOT_FOUND, "This page does not exist!".to_string().into()));
+        return Err((StatusCode::NOT_FOUND, headers, get_error_page("Etwas lief schief beim Erstellen des Briefs (1).")));
     }
 
     let pdf_name = match page {
@@ -815,8 +830,8 @@ pub async fn get_pdf(Path(params): Path<HashMap<String, String>>) -> impl IntoRe
     let file = match File::open(file_path).await {
         Ok(file) => file,
         Err(err) => {
-            info!("could not find pdf file with page {}, page {} and id {}, current dir: {}", &page, &pdf_name, &name, env::current_dir().unwrap().display());
-            return Err((StatusCode::NOT_FOUND, format!("File not found: {}", err)))
+            info!("could not find pdf file with page {}, page {} and id {}, current dir: {}. With error: {}", &page, &pdf_name, &name, env::current_dir().unwrap().display(), err);
+            return Err((StatusCode::NOT_FOUND, headers, get_error_page("Die Datei konnte nicht gefunden werden.")));
         },
     };
     
