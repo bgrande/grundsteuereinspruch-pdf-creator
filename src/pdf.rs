@@ -1,4 +1,5 @@
-use html2pdf::{run, CliOptions, Error as H2PError};
+use std::path::PathBuf;
+use html2pdf::{run, Options, Error as H2PError};
 use structopt::StructOpt;
 use log::{error};
 
@@ -48,11 +49,25 @@ pub fn create_pdf_by_id(base_path: String) -> Option<bool> {
 }
 
 fn html2pdf(path: String, result_path: String) -> std::result::Result<(), H2PError> {
-    let options = Vec::from(["input", path.as_str(), "--output", result_path.as_str()]);
-    let opt = CliOptions::from_iter(options);
+    let input_path = PathBuf::from(path);
+    let output_path = PathBuf::from(result_path);
+
+    let options = Options {
+        input: input_path,
+        output: Some(output_path),
+        landscape: false,
+        background: false,
+        wait: None,
+        header: None,
+        footer: None,
+        paper: None,
+        scale: None,
+        range: None,
+        margin: None,
+    };
 
     // Let's go
-    run(opt)
+    run(&options)
 }
 
 fn to_result(from_2pdf: ()) -> bool {

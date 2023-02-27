@@ -13,7 +13,7 @@
 + main endpoint for separate application
 - letter improvements
   + see https://www.t-online.de/finanzen/geld-vorsorge/steuern/id_100122008/fehler-im-grundsteuerbescheid-musterschreiben-fuer-ihren-einspruch.html)
-  - improve wording in letter! Take both into account
+  + improve wording in letter! Take both into account
   - add possibility to give explanations to Einspruch reasons? 
 + Sonstiges sollte nicht in die Auflistung!
 + use logging instead of tracing (with error!, debug!, ...)

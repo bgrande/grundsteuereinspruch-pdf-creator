@@ -800,7 +800,7 @@ pub async fn hello() -> &'static str {
 }
 
 pub async fn get_pdf(Path(params): Path<HashMap<String, String>>) -> impl IntoResponse {
-    let headers = [(header::CONTENT_TYPE, "text/html")];
+    let mut headers = [(header::CONTENT_TYPE, "text/html")];
 
     let name = match params.get("id") {
         None => "",
@@ -840,13 +840,10 @@ pub async fn get_pdf(Path(params): Path<HashMap<String, String>>) -> impl IntoRe
     // convert the `Stream` into an `axum::body::HttpBody`
     let body = StreamBody::new(stream);
 
-    let headers = AppendHeaders([
-        (header::CONTENT_TYPE, "application/pdf"),
-        (
-            header::CONTENT_DISPOSITION,
-            "attachment; filename=\"GrundsteuereinspruchOnline-Rechnung.pdf\"",
-        ),
-    ]);
+    let headers = [
+        (header::CONTENT_TYPE, "application/pdf".to_string()),
+        (header::CONTENT_DISPOSITION, format!("attachment; filename=\"{}\"", pdf_name)),
+    ];
 
     Ok((headers, body))
 }

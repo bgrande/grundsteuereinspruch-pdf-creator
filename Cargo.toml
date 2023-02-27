@@ -21,7 +21,7 @@ sync_wrapper = "0.1"
 sqlx = { version = "0.6", features = [ "runtime-tokio-rustls", "sqlite" ] }
 tokio = { version = "1.20", features = [ "macros", "io-util" ]}
 tokio-util = {version = "0.7.4", features = [ "io" ] }
-html2pdf = "0.5"
+html2pdf = "0.6"
 rand = "0.8.5"
 ring = "0.16.20"
 serde = { version = "1.0", features = ["derive"] }
