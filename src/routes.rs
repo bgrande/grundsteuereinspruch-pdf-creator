@@ -6,7 +6,7 @@ use axum::extract::{Path, Query, State};
 use axum::{extract};
 use axum::body::StreamBody;
 use axum::http::{header, StatusCode};
-use axum::response::{IntoResponse, AppendHeaders};
+use axum::response::{IntoResponse};
 use chrono::{Duration, LocalResult, Utc};
 use chrono::LocalResult::Single;
 use chrono::prelude::*;
@@ -328,10 +328,6 @@ pub async fn create_html(
             letter.phone = current_value[0].clone();
         }
 
-        if field.key == "question_nGQE8p" {
-            letter.sender_names.push(current_value[0].clone());
-        }
-
         if field.key == "question_wAjR0o" {
             let max_count_val = current_value[0].clone();
 
@@ -343,6 +339,7 @@ pub async fn create_html(
 
         let sender_name = current_value[0].clone();
         if field.key == "question_nGQE8p" {
+            letter.sender_names.push(format!("{} {}", letter.first_name, letter.last_name));
             letter.sender_names.push(sender_name.clone());
         }
         if field.key == "question_mV472J" {
@@ -800,7 +797,7 @@ pub async fn hello() -> &'static str {
 }
 
 pub async fn get_pdf(Path(params): Path<HashMap<String, String>>) -> impl IntoResponse {
-    let mut headers = [(header::CONTENT_TYPE, "text/html")];
+    let headers = [(header::CONTENT_TYPE, "text/html")];
 
     let name = match params.get("id") {
         None => "",

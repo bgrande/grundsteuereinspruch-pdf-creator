@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use html2pdf::{run, Options, Error as H2PError};
-use structopt::StructOpt;
 use log::{error};
 
 use crate::config::TEMPLATE_NAME_LETTER;
