@@ -8,6 +8,7 @@ fn parse_value<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
     #[serde(untagged)]
     enum AnyType<'a> {
         Str(&'a str),
+        String(String),
         U64(u64),
         Vec(Vec<String>),
         Bool(bool),
@@ -16,6 +17,7 @@ fn parse_value<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
 
     Ok(match AnyType::deserialize(deserializer)? {
         AnyType::Str(v) => Some(vec![v.to_string()]),
+        AnyType::String(v) => Some(vec![v]),
         AnyType::U64(v) => Some(vec![v.to_string()]),
         AnyType::Vec(v) => Some(v),
         AnyType::Bool(v) => Some(vec![v.to_string()]),
