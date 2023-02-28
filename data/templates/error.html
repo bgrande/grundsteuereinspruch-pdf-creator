@@ -10,7 +10,7 @@
 
 	<link href="https://grundsteuereinspruch.online/styles.css" rel="stylesheet">
 
-	{% if additional_head %}{{head}}{% endif %}
+	{% if additional_head %}{{additional_head}}{% endif %}
 	<style> .external:before {content: "\1F855";padding-right: 6px;}</style>
 <!--
 	<style>
@@ -63,8 +63,8 @@
 	<div class="max-w-screen-xl px-4 pt-20 pb-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:pt-28">
 		<div class="mr-auto place-self-center lg:col-span-7">
 			<h1 class="max-w-2xl mb-4 text-2xl font-extrabold leading-none tracking-tight md:text-3xl xl:text-4xl dark:text-white">Leider ist ein Fehler aufgetreten!</h1>
-			<p class="max-w-xl mb-4 font-light text-gray-500 md:text-lg lg:text-xl dark:text-gray-400">{error_msg}</p>
-			<p class="max-w-xl mb-4 font-light text-gray-500 md:text-lg lg:text-xl dark:text-gray-400">ID: {error_id}</p>
+			<p class="max-w-xl mb-4 font-light text-gray-500 md:text-lg lg:text-xl dark:text-gray-400">{{error_msg}}</p>
+			<p class="max-w-xl mb-4 font-light text-gray-500 md:text-lg lg:text-xl dark:text-gray-400">ID: {{error_id}}</p>
 			<div class="mt-6">
 				<p class="pt-6 text-gray-500 dark:text-gray-400">Schreiben Sie bitte eine E-Mail an <a href="mailto:fehler@grundsteuereinspruch.online?subject=Fehler beim Erstellen des Briefs&body=Ich habe ein Problem mit der ID {{error_id}}: {{error_msg}}{% if additional %}; {{additional}}{% endif %}" class="text-purple-600 dark:text-purple-500 hover:underline">fehler@grundsteuereinspruch.online</a> mit Angabe der Fehler ID sowie der Fehlernachricht.</p>
 			</div>
