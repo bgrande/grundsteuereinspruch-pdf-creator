@@ -1,5 +1,4 @@
 # 1.0.0
-+ add Einspruch wg. Verfassungsklage wie in: https://youtu.be/nZDXlx8dWHA
 - split request handler functions into separate sub functions
 - ausländische Nutzer?
 - add a password (basic auth) (the customer's zip) to make it a bit more secure
@@ -10,10 +9,15 @@
 - add possibility to give explanations to Einspruch reasons?
 - add phone number in letter?
 - collision check for file_id folder -> if already existing, try again (until no collision) -> preventing accidental override and data leaking
+- delete mappings (after successfully used)
 
 # 0.3.0
-- fix folder + files creation on prod!
-- Einspruchtemplate tests
+- Payment/Checkoutseite mehr als solche (getrennt vom Rest) hervorheben
+- Datenschutzvereinbarung doch zustimmen?
+- really remove the pages from history!
++ add Einspruch wg. Verfassungsklage wie in: https://youtu.be/nZDXlx8dWHA
++ fix folder + files creation on prod!
++ Einspruchtemplate tests
 - Einspruchtemplate multiple pages -> print
 - test cases:
     - 1. all possible fin plz+names -> should be 1 result each
@@ -36,7 +40,7 @@
 # 0.1.0
 + download pdf
 + how to get the tax office db on deploy?
-  - einchecken in git?
+  + einchecken in git?
 + templates in deploy: einchecken?
 + email, etc.: secrets + einchecken? 
 + how to integrate the templates (separate repo) -
