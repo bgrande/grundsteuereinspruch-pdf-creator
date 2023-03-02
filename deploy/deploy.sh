@@ -13,6 +13,9 @@ rsync \
   --delete \
   -e "ssh -i deploy/gseonline_deploy_id_rsa -o IdentitiesOnly=yes" \
   build/ \
-  pdfcreator@app.grundsteuereinspruch.online:/home/pdfcreator/app
+  pdfcreator@app.grundsteuereinspruch.online:/home/pdfcreator/app \
+  --cvs-exclude \
+  --exclude=diedaten
+
 
 ssh -i deploy/gseonline_deploy_id_rsa -o IdentitiesOnly=yes pdfcreator@app.grundsteuereinspruch.online 'sudo /bin/systemctl restart pdfcreator'
