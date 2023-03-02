@@ -73,6 +73,9 @@ runcmd:
   - apt-get install -y fail2ban
   - apt-get install -y certbot python3-certbot-nginx
   - apt-get install -y nginx
+  - apt-get install -y libappindicator1 fonts-liberation
+  - wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && dpkg -i google-chrome-stable_current_amd64.deb
+  - apt-get install -f -y && dpkg -i google-chrome-stable_current_amd64.deb
   - printf "[sshd]\nenabled = true\nbanaction = iptables-multiport" > /etc/fail2ban/jail.local
   - systemctl enable fail2ban
   - ufw allow OpenSSH
