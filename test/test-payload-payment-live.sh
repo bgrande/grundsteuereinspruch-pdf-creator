@@ -1,6 +1,6 @@
 #!/bin/bash
 curl -X POST \
-  http://0.0.0.0:8000/html \
+  https://app.grundsteuereinspruch.online/html \
   -H 'Content-Type: application/json' \
   -d @./test/payload-example-payment.json \
   -v \
