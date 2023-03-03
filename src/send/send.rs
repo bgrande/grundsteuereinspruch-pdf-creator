@@ -38,7 +38,7 @@ pub(crate) fn send_email(letter: &Letter, link: String, email_conf: AnyResult<Em
 "Hallo {} {}!\r\n\r\nSie haben soeben den Fragebogen zur Brieferstellung auf grundsteuereinspruch.online ausgefüllt.\r\n\r\n
 Ihr Downloadlink lautet:\r\n\
 {}.\r\n\r\n
-Das Passwort ist Ihre Postleitzahl!\r\n\r\n
+Der Link ist Ihr persönlicher Zugang zu Ihrem Brief. Bitte geben Sie diese E-Mail bzw. den Link an niemanden weiter!\r\n\r\n
 Bei Fragen antworten Sie einfach auf diese E-Mail!\r\n\r\n
 Mit freundlichen Grüßen\r\n\
 Ihr Grundsteuereinspruch Online Team\r\n\r\n\

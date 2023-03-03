@@ -10,11 +10,12 @@
 - add phone number in letter?
 - collision check for file_id folder -> if already existing, try again (until no collision) -> preventing accidental override and data leaking
 - delete mappings (after successfully used)
-
-# 0.3.0
-- Payment/Checkoutseite mehr als solche (getrennt vom Rest) hervorheben
 - Datenschutzvereinbarung doch zustimmen?
 - really remove the pages from history!
+
+# 0.3.0
+- shorten (and/or group) the list of reasons 
+- Payment/Checkoutseite mehr als solche (getrennt vom Rest) hervorheben
 + add Einspruch wg. Verfassungsklage wie in: https://youtu.be/nZDXlx8dWHA
 + fix folder + files creation on prod!
 + Einspruchtemplate tests
