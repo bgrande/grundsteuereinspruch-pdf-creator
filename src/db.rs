@@ -33,10 +33,25 @@ JOIN tax_office tao ON atto.tax_office_id = tao.id
 WHERE
     zip = ?
     AND name = ?
+UNION
+SELECT
+    pb.city,
+    'Postfach' as street,
+    pb.number,
+    pb.zip,
+    tao.name
+FROM postbox pb
+JOIN postbox_to_tax_office potto ON pb.id = potto.postbox_id
+JOIN tax_office tao ON potto.tax_office_id = tao.id
+WHERE
+    zip = ?
+    AND name = ?
 "
     )
-        .bind(zip)
-        .bind(name)
+        .bind(zip.clone())
+        .bind(name.clone())
+        .bind(zip.clone())
+        .bind(name.clone())
         .fetch_one(&pool).await?;
 
     Ok(row)

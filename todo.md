@@ -14,8 +14,9 @@
 - really remove the pages from history!
 
 # 0.3.0
-- shorten (and/or group) the list of reasons 
-- Payment/Checkoutseite mehr als solche (getrennt vom Rest) hervorheben
++ fix postbox retrieval
++ shorten (and/or group) the list of reasons 
++ Payment/Checkoutseite mehr als solche (getrennt vom Rest) hervorheben
 + add Einspruch wg. Verfassungsklage wie in: https://youtu.be/nZDXlx8dWHA
 + fix folder + files creation on prod!
 + Einspruchtemplate tests
