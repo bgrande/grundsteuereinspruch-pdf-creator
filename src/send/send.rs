@@ -2,11 +2,11 @@ use anyhow::Result as AnyResult;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::{fs, thread, time};
 use lettre::message::header::{ContentTransferEncoding, ContentType};
 use log::{error, info};
 
-use crate::objects::Letter;
+use crate::objects::{Invoice, Letter};
 
 const CONFIG_FILE: &str = "data/db/email.json";
 
@@ -14,6 +14,7 @@ const CONFIG_FILE: &str = "data/db/email.json";
 pub(crate) struct EmailConfig {
     from_name: String,
     from_email: String,
+    invoice_email: String,
     smtp_host: String,
     smtp_user: String,
     smtp_pass: String,
@@ -55,6 +56,54 @@ mail@grundsteuereinspruch.online
     let from = format!("{} <{}>", email_config.from_name, email_config.from_email);
     let subject = "Ihr Brief von Grundsteuereinspruch Online";
     let to = format!("{} {} <{}>", letter.first_name, letter.last_name, email);
+
+    let email = Message::builder()
+        .from(from.parse()?)
+        .to(to.parse()?)
+        .header(ContentTransferEncoding::Base64)
+        .header(ContentType::TEXT_PLAIN)
+        .subject(subject)
+        .body(body)
+        ?;
+
+    let creds = Credentials::new(email_config.smtp_user, email_config.smtp_pass);
+
+    let mailer = SmtpTransport::relay(&email_config.smtp_host)?
+        .credentials(creds)
+        .build();
+
+    match mailer.send(&email) {
+        Ok(_) => {
+            info!("Email sent successfully!");
+        }
+        Err(e) => {
+            error!("Could not send email: {:?}", e);
+        }
+    }
+
+    Ok(true)
+}
+
+pub(crate) async fn send_email_owner(invoice_link: String, email_conf: AnyResult<EmailConfig>) -> AnyResult<bool> {
+    let sleep_time = time::Duration::from_millis(1000); // wait 1 sec since we already might have sent an email, before
+    thread::sleep(sleep_time);
+    let body = format!(
+        "Hallo Chef!\r\n\r\nJemand hat soeben den Fragebogen zur Brieferstellung auf grundsteuereinspruch.online ausgefüllt.\r\n\r\n
+Der Rechnungslink lautet:\r\n\
+{}.\r\n\r\n
+Bitte herunterladen und zu den Unterlagen hinzufügen!\r\n\r\n
+Mit freundlichen Grüßen\r\n\
+Ihr Grundsteuereinspruch Online Roboter\r\n\r\n\
+www.grundsteuereinspruch.online
+",
+        invoice_link
+    );
+
+    let email_config = email_conf?;
+
+    let from = format!("{} <{}>", email_config.from_name, email_config.from_email);
+    let subject = "Ihr Brief von Grundsteuereinspruch Online";
+    let to = format!("{} <{}>", email_config.from_name, email_config.invoice_email);
 
     let email = Message::builder()
         .from(from.parse()?)

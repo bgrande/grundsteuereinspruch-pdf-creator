@@ -23,7 +23,7 @@ use crate::objects::*;
 use crate::config::*;
 use crate::form::QuestionResult;
 
-use crate::send::send::{get_email_config, send_email};
+use crate::send::send::{get_email_config, send_email, send_email_owner};
 
 use structopt::lazy_static::lazy_static;
 use tera::{Context, Tera};
@@ -72,8 +72,10 @@ pub async fn create_pdf(Path(params): Path<HashMap<String, String>>) -> &'static
 
 pub async fn create_html(
     State(state): State<Arc<AppState>>,
-    extract::Json(payload): extract::Json<QuestionResult>
+    extract::Json(payload): extract::Json<QuestionResult>,
 ) -> impl IntoResponse  {
+    let pay_after = false; // todo for other payments
+
     let headers = [(header::CONTENT_TYPE, "text/html")];
 
     let file_id = match create_random_id() {
@@ -716,13 +718,23 @@ pub async fn create_html(
         },
     };
 
-    match send_email(&letter, link, get_email_config(state.email_user.clone(), state.email_pass.clone())) {
+    if !pay_after {
+        match send_email(&letter, link, get_email_config(state.email_user.clone(), state.email_pass.clone())) {
+            // ok is just fine
+            Ok(_) => {},
+            Err(e) => error!("unexpected error while sending email: {}", e)
+        };
+    }
+
+    let invoice_link = format!("{}/pdf/{}/invoice", base_url, file_id);
+
+    match send_email_owner(invoice_link, get_email_config(state.email_user.clone(), state.email_pass.clone())).await {
         // ok is just fine
         Ok(_) => {},
-        Err(e) => error!("unexpected error while sending email: {}", e)
+        Err(e) => error!("unexpected error while sending invoice email home: {}", e)
     };
 
-    return Ok((StatusCode::OK, headers, "ok".to_string()));
+    return Ok((StatusCode::CREATED, headers, "ok".to_string()));
 }
 
 pub async fn get_html(Path(params): Path<HashMap<String, String>>) -> impl IntoResponse {
