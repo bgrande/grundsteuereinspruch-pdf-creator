@@ -710,7 +710,7 @@ pub async fn create_html(
     let sleep_time = time::Duration::from_millis(1000);
     thread::sleep(sleep_time);
 
-    let pdf_creation_result = match create_pdf_by_id(base_path.clone()) {
+    let _pdf_creation_result = match create_pdf_by_id(base_path.clone()) {
         Some(_) => "success".to_string(),
         None => {
             error!("PDF creation failed for unknown reason");

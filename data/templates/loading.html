@@ -150,7 +150,7 @@
 	async function poll(targetUrl) {const reviews = await fetch(targetUrl, {method: "GET", mode: "cors"}).then(async function (response) {if (response.ok) {location.href = targetUrl}});}
 	setInterval(function() {
 		poll(targetUrl)
-	}, 600);
+	}, 6000);
 </script>
 
 <!--<script src="https://usagelog.pagereply.com/logjs?source=grundsteuereinspruch.online" defer async></script>-->

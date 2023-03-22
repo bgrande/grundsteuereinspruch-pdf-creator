@@ -7,7 +7,7 @@ use lettre::message::{Attachment, MultiPart, SinglePart};
 use lettre::message::header::{ContentTransferEncoding, ContentType};
 use log::{error, info};
 
-use crate::objects::{Invoice, Letter};
+use crate::objects::{Letter};
 
 const CONFIG_FILE: &str = "data/db/email.json";
 
