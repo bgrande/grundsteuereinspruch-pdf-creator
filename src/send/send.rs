@@ -3,6 +3,7 @@ use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
 use serde::{Deserialize, Serialize};
 use std::{fs, thread, time};
+use lettre::message::{Attachment, MultiPart, SinglePart};
 use lettre::message::header::{ContentTransferEncoding, ContentType};
 use log::{error, info};
 
@@ -84,19 +85,24 @@ mail@grundsteuereinspruch.online
     Ok(true)
 }
 
-pub(crate) async fn send_email_owner(invoice_link: String, email_conf: AnyResult<EmailConfig>) -> AnyResult<bool> {
-    let sleep_time = time::Duration::from_millis(1000); // wait 1 sec since we already might have sent an email, before
+pub(crate) async fn send_email_owner(invoice_pdf_path: String, filename: String, email_conf: AnyResult<EmailConfig>) -> AnyResult<bool> {
+    // wait 1 sec since we already might have sent an email, before
+    let sleep_time = time::Duration::from_millis(1000);
     thread::sleep(sleep_time);
+     info!("path: {}", invoice_pdf_path);
+    let filebody = fs::read(invoice_pdf_path)?;
+    let content_type = ContentType::parse("application/pdf")?;
+    let attachment = Attachment::new(filename).body(filebody, content_type);
+
+
     let body = format!(
         "Hallo Chef!\r\n\r\nJemand hat soeben den Fragebogen zur Brieferstellung auf grundsteuereinspruch.online ausgefüllt.\r\n\r\n
-Der Rechnungslink lautet:\r\n\
-{}.\r\n\r\n
+Anbei findet sich die Rechnung.\r\n\
 Bitte herunterladen und zu den Unterlagen hinzufügen!\r\n\r\n
 Mit freundlichen Grüßen\r\n\
 Ihr Grundsteuereinspruch Online Roboter\r\n\r\n\
 www.grundsteuereinspruch.online
-",
-        invoice_link
+"
     );
 
     let email_config = email_conf?;
@@ -108,10 +114,17 @@ www.grundsteuereinspruch.online
     let email = Message::builder()
         .from(from.parse()?)
         .to(to.parse()?)
-        .header(ContentTransferEncoding::Base64)
-        .header(ContentType::TEXT_PLAIN)
         .subject(subject)
-        .body(body)
+        .multipart(
+            MultiPart::mixed()
+                .singlepart(
+                    SinglePart::builder()
+                    .header(ContentTransferEncoding::Base64)
+                    .header(ContentType::TEXT_PLAIN)
+                    .body(body)
+                )
+                .singlepart(attachment)
+        )
         ?;
 
     let creds = Credentials::new(email_config.smtp_user, email_config.smtp_pass);

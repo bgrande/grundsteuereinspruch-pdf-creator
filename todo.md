@@ -12,6 +12,25 @@
 - delete mappings (after successfully used)
 - Datenschutzvereinbarung doch zustimmen?
 - really remove the pages from history!
+- multi-page -> all pages should have the Markierungen and page numbering
+  - page numbering on each page
+  - Marking on each page
+  - prettier page (more like the tipps list)
+- make invoice prettier (like tipps list)
+- copy/sent the invoice to me (dashboard vs. email) -> for accounting!
+- double the price (needs new payment field it seems)
+- test cases:
+    - 1. all possible fin plz+names -> should be 1 result each
+    - 2. all possible PLZ (customer) to fin office -> Ausreißer
+    - check if deadline date is correct
+    - test different cases (multiple page, 10 senders, ...)
+    + test at shuttle endpoint -> doesn't find files
+- use proper status codes (i.e. 201 Created for API /html endpoint) -> https://www.codetinkerer.com/2015/12/04/choosing-an-http-status-code.html
++ send invoice via email to me
+- allow Überweisung
+  - Rechnung: per Vorkasse (vorab mailen? -> attachment!)
+  - Neuer Fragebogen (Kopie) ohne payment mit Angabe von Bankdaten zur Vorabüberweisung und Hinweis auf Linkzusendung nach Eingang 
+  - Neuer Endpoint (bzw. extra parameter aus form), der nur die Rechnung verschickt 
 
 # 0.3.0
 + fix postbox retrieval
@@ -20,13 +39,7 @@
 + add Einspruch wg. Verfassungsklage wie in: https://youtu.be/nZDXlx8dWHA
 + fix folder + files creation on prod!
 + Einspruchtemplate tests
-- Einspruchtemplate multiple pages -> print
-- test cases:
-    - 1. all possible fin plz+names -> should be 1 result each
-    - 2. all possible PLZ (customer) to fin office -> Ausreißer
-    - check if deadline date is correct
-    - test different cases (multiple page, 10 senders, ...)
-    + test at shuttle endpoint -> doesn't find files
++ Einspruchtemplate multiple pages -> print
 
 # 0.2.0
 + split functions into separate files and modules

@@ -651,7 +651,7 @@ pub async fn create_html(
         }
     };
 
-    match fs::write(invoice_path, invoice_result) {
+    match fs::write(invoice_path.clone(), invoice_result) {
         Ok(_) => {},
         Err(_) => {
             error!("Etwas ging schief beim Erstellen der Rechnung (3).");
@@ -710,7 +710,7 @@ pub async fn create_html(
     let sleep_time = time::Duration::from_millis(1000);
     thread::sleep(sleep_time);
 
-    let pdf_creation_result = match create_pdf_by_id(base_path) {
+    let pdf_creation_result = match create_pdf_by_id(base_path.clone()) {
         Some(_) => "success".to_string(),
         None => {
             error!("PDF creation failed for unknown reason");
@@ -726,9 +726,10 @@ pub async fn create_html(
         };
     }
 
-    let invoice_link = format!("{}/pdf/{}/invoice", base_url, file_id);
+    let pdf_invoice_path = format!("{}/{}", base_path, RESULT_NAME_INVOICE);
+    let invoice_file_name = format!("{}-Rechnung-{}_{}", date_now, invoice.first_name, invoice.last_name);
 
-    match send_email_owner(invoice_link, get_email_config(state.email_user.clone(), state.email_pass.clone())).await {
+    match send_email_owner(pdf_invoice_path, invoice_file_name, get_email_config(state.email_user.clone(), state.email_pass.clone())).await {
         // ok is just fine
         Ok(_) => {},
         Err(e) => error!("unexpected error while sending invoice email home: {}", e)
