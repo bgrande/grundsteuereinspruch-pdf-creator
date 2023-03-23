@@ -25,6 +25,7 @@ pub struct Letter {
     pub sent_date: String,
     pub subject_text: String,
     pub additional_senders: bool,
+    pub multiple_objection_subjects: bool,
 }
 #[derive(Serialize)]
 pub struct Payment {

@@ -27,10 +27,12 @@
     + test at shuttle endpoint -> doesn't find files
 - use proper status codes (i.e. 201 Created for API /html endpoint) -> https://www.codetinkerer.com/2015/12/04/choosing-an-http-status-code.html
 + send invoice via email to me
++ improve letter text
 - allow Überweisung
-  - Rechnung: per Vorkasse (vorab mailen? -> attachment!)
+  - Rechnung: per Vorkasse (vorab mailen! -> attachment!)
   - Neuer Fragebogen (Kopie) ohne payment mit Angabe von Bankdaten zur Vorabüberweisung und Hinweis auf Linkzusendung nach Eingang 
-  - Neuer Endpoint (bzw. extra parameter aus form), der nur die Rechnung verschickt 
+  - Neuer Endpoint (bzw. extra parameter aus form), der nur die Rechnung verschickt
+    - split and wrap the creation endpoint
 
 # 0.3.0
 + fix postbox retrieval

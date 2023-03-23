@@ -99,11 +99,12 @@
 			</div>
 			<p class="title">Sehr geehrte Damen und Herren,</p>
 			<p>
-				gegen den oben genannten Bescheid zum <i>{% for date in objection_subject_start_dates %}{% if loop.index == 2%} bzw. {% endif %}{{date}}{% endfor %}</i>
-				über die Feststellung des {% for subj in objection_subjects %}{% if loop.index == 2 %} und {% endif %}{{subj}}{% endfor %} vom {{sent_date}}
-				lege{% if additional_senders %}n wir{% else %} ich{% endif %} hiermit Einspruch ein.
-				<br><br>
-				Begründung:
+				bezugnehmend auf Ihr Schreiben vom {{sent_date}} lege{% if additional_senders %}n wir{% else %} ich{% endif %} hiermit
+				gegen {% if multiple_objection_subjects %}die{% else %}den{% endif %} Bescheid{% if multiple_objection_subjects %}e{% endif %}
+				über die Feststellung des {% for subj in objection_subjects %}{% if loop.index == 2 %} und des {% endif %}{{subj}} zum <i>{% if loop.index == 1 %}{{objection_subject_start_dates.0}}{% elif loop.index == 2 %}{{objection_subject_start_dates.1}}{% endif %}</i>{% endfor %} Einspruch ein.
+			</p>
+			<p>
+				{% if additional_senders %}Wir begründen{% else %} Ich begründe{% endif %} den Einspruch wie folgt:
 			</p>
 			<ul>
 				{% for objection in objection_subject_reasons %}<li>{{objection}}</li>{% endfor %}

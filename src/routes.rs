@@ -152,6 +152,7 @@ pub async fn create_html(
         sent_date: "".to_string(),
         subject_text: "Einspruch gegen den Bescheid zur Feststellung des ".to_string(),
         additional_senders: false,
+        multiple_objection_subjects: false,
     };
 
     let mut invoice = Invoice {
@@ -371,6 +372,10 @@ pub async fn create_html(
 
         if letter.sender_names.len() > 1 {
             letter.additional_senders = true;
+        }
+
+        if letter.objection_subjects.len() > 1 {
+            letter.multiple_objection_subjects = true;
         }
 
         if field.key == "question_mJWZ0r" {
