@@ -9,32 +9,39 @@
 	<meta name="robots" content="noindex,nofollow"/>
 
 	<style>
+		@page { size: A4; }
 		html {box-sizing: border-box}
-		body {margin: 0; overflow: auto; padding: 0; left: 0; right: 0; top: 0; bottom: 0; color: #000000; width: auto; height: auto; background: #ffffff; }
-		.container { box-sizing: border-box; position: relative; margin: 0 1cm; font-family: "Cumberland",serif }
+		body {margin: 1.2cm 1cm; overflow: auto; padding: 0; left: 0; right: 0; top: 0; bottom: 0; color: #000000; width: auto; height: auto; background: #ffffff; }
+		footer { position: fixed; bottom: 0}
+		.container { box-sizing: border-box; position: relative; margin: 0; font-family: "Cumberland",serif }
 		p { margin-bottom: 0.21cm; letter-spacing: 0.1pt; line-height: 1.3; font-size: 11pt}
 
-		aside { position: absolute; margin: 0; top: 7.2cm; left: 0; width: 1.1cm; height: 16cm; padding: 0; }
+		aside { position: fixed; margin: 0; top: 6cm; left: 0; width: 1.1cm; height: 16cm; padding: 0; }
 		aside div { font-family: "Cumberland", monospace; color: #999999}
 
-		div.sender_address { position: absolute; width: 10cm; height: 3cm; border: none; padding: 0; page-break-after: avoid;}
-		div.sender_address p { font-size: 11.5pt}
-		div.sender_address p.sender_address { text-align: left; font-size: 12.5pt; line-height: 1.3; margin-top: 0; margin-bottom: 0.1cm; font-family: "Thorndale", serif }
+		header.sender_address {position: absolute; top: 0; width: 10cm; height: 3cm; border: none; padding: 0; page-break-after: avoid;}
+		header.sender_address p {font-size: 11.5pt; margin:0}
+		header.sender_address p.sender_name { text-align: left; font-size: 12.5pt; line-height: 1.3; margin-top: 0; margin-bottom: 0.1cm; font-family: "Thorndale", serif }
 
-		div.senders { position: absolute; right: 0; width: auto; max-width: 8cm; height: 7.6cm; border: none; padding: 0; page-break-after: avoid;}
+		div.senders {position: absolute; top: 0; right: 0; width: auto; max-width: 7cm; height: 7.6cm; border: none; padding: 0; page-break-after: avoid;}
+		div.senders p {margin: 0}
+		div.senders .senders_intro {margin-bottom: 0.1cm}
 
-		.start_letter_block {position: absolute; top: 3.8cm; width: 15cm;}
+		.start_letter_block {position: absolute; top: 2.6cm; width: 15cm;}
 		.sender_address_letter { position: relative; height: 0.9cm; border: none; padding: 0; overflow: hidden; }
 		.sender_address_letter p { margin-bottom: 0; font-style: normal; font-size: 9pt }
 		.receiver_text { position: relative; height: 2.51cm; border: none; padding: 0; padding-top: 0.1cm; width: 9cm; }
 		.receiver_text p { font-family: "Cumberland", monospace; font-size: 11pt; margin: 0; line-height: 1.5;}
 
-		main { position: absolute; top: 8cm; width: 100%; height: auto; border: none; padding: 0; }
+		main { position: absolute; top: 6cm; width: 100%; height: auto; border: none; padding: 0; }
 		.send_date {position: absolute; right: 0; width: 4cm; text-align: right; margin-bottom: 0; margin-top: 0.63cm}
 		.send_greet {margin-top: 0.63cm; page-break-after: avoid}
 		.subject_text {margin-top: 0.63cm; margin-bottom: 0.63cm}
 		.subject_title, .subject_content {display: block; line-height: 2}
 		.title {line-height: 2}
+		.marks {position: fixed}
+		.page_number {position: absolute; height: 16px;}
+		header, .header-space, footer, .footer-space {height: 3cm;}
 
 		.debug .start_letter_block {overflow: hidden; width: 10cm; border: 1px solid red}
 		.debug div.sender_address, .debug div.senders, .debug .marks, .debug .marks div, .debug main, .debug .subject_text, .debug .send_date {border: 1px solid red}
@@ -47,29 +54,28 @@
 		<div style="margin-top: 4.45cm;">––</div>
 		<div style="margin-top: 5.2cm">––</div>
 	</aside>
+	<header id="sender_address" class="sender_address">
+		<p class="sender_name">
+			<span class="sender_first_name">{{first_name}}</span> <span class="sender_last_name">{{last_name}}</span>
+		</p>
+		<p>
+			<span class="sender_street">{{street}}</span> <span class="sender_street_number">{{number}}</span><br>
+			<span class="sender_zip">{{zip}}</span> <span class="sender_city">{{city}}</span><br>
+			<span class="sender_email">{{email}}</span>
+		</p>
+	</header>
+	{% if sender_names %}
+	<div id="senders" class="senders">
+		<div class="senders_intro">{{sender_names_intro}}</div>
+		<p>
+			{%- for sender_name in sender_names %}
+			{{sender_name}}<br>
+			{% endfor -%}
+		</p>
+	</div>
+	{% endif %}
 	<div class="container">
-		<div id="sender_address" class="sender_address">
-			<p class="sender_address">
-				<span class="sender_first_name">{{first_name}}</span> <span class="sender_last_name">{{last_name}}</span>
-			</p>
-			<p>
-				<span class="sender_street">{{street}}</span> <span class="sender_street_number">{{number}}</span><br>
-				<span class="sender_zip">{{zip}}</span> <span class="sender_city">{{city}}</span><br>
-				<span class="sender_email">{{email}}</span>
-			</p>
-		</div>
-
-		{% if sender_names %}
-		<div id="senders" class="senders">
-			<div>{{sender_names_intro}}</div>
-			<p>
-				{%- for sender_name in sender_names %}
-				{{sender_name}}<br>
-				{% endfor -%}
-			</p>
-		</div>
-		{% endif %}
-
+		<div class="header-space">&nbsp;</div>
 		<div class="start_letter_block">
 			<div id="sender_address_letter" class="sender_address_letter">
 					<p>
@@ -109,7 +115,6 @@
 			<ul>
 				{% for objection in objection_subject_reasons %}<li>{{objection}}</li>{% endfor %}
 			</ul>
-
 			<p>
 				{% if additional_senders %}Wir bitten{% else %}Ich bitte{% endif %} außerdem darum, den Eingang dieses Schreibens zu bestätigen.
 			</p>
@@ -130,6 +135,26 @@
 				body.classList.add('debug')
 			}
 		})(document);
+	</script>
+	<script type="text/javascript">
+          function addPageNumbers() {
+            var totalPages = Math.ceil(document.body.scrollHeight / 1123);  // 842px A4 pageheight for 72dpi, 1123px A4 pageheight for 96dpi,
+            if (totalPages <= 1) { return; }
+            
+            for (let i = 1; i <= totalPages; i++) {
+              const pageNumberDiv = document.createElement("div");
+              const pageNumber = document.createTextNode("Seite " + i + " von " + totalPages);
+              pageNumberDiv.className = "page_number";
+   			  pageNumberDiv.style.top = "calc((" + i + " * (297mm - 2.2cm)) - 40px)"; //297mm A4 pageheight; 2.2cm unknown needed necessary correction value; additional wanted 40px margin from bottom(own element height included)
+              pageNumberDiv.appendChild(pageNumber);
+              document.body.insertBefore(pageNumberDiv, document.getElementById("container"));
+              pageNumberDiv.style.left = "calc(100% - (" + pageNumberDiv.offsetWidth + "px + 1.2cm))";
+            }
+          }
+
+          (function() {
+          	addPageNumbers();
+          })();
 	</script>
 </body>
 </html>

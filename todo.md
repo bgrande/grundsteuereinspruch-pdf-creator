@@ -10,11 +10,13 @@
 - add phone number in letter?
 - collision check for file_id folder -> if already existing, try again (until no collision) -> preventing accidental override and data leaking
 - delete mappings (after successfully used)
+  -> either daily cron (delete > 1 day) or right after succesful redirect 
 - Datenschutzvereinbarung doch zustimmen?
 - really remove the pages from history!
-- multi-page -> all pages should have the Markierungen and page numbering
-  - page numbering on each page
-  - Marking on each page
++ multi-page -> all pages should have the Markierungen and page numbering
+  + page numbering on each page
+  + Marking on each page
+  - header address like https://medium.com/@Idan_Co/the-ultimate-print-html-template-with-header-footer-568f415f6d2a?
   - prettier page (more like the tipps list)
 - make invoice prettier (like tipps list)
 - copy/sent the invoice to me (dashboard vs. email) -> for accounting!
