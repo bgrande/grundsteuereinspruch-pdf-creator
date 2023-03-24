@@ -107,7 +107,7 @@
 			<p>
 				bezugnehmend auf Ihr Schreiben vom {{sent_date}} lege{% if additional_senders %}n wir{% else %} ich{% endif %} hiermit
 				gegen {% if multiple_objection_subjects %}die{% else %}den{% endif %} Bescheid{% if multiple_objection_subjects %}e{% endif %}
-				über die Feststellung des {% for subj in objection_subjects %}{% if loop.index == 2 %} und des {% endif %}{{subj}} zum <i>{% if loop.index == 1 %}{{objection_subject_start_dates.0}}{% elif loop.index == 2 %}{{objection_subject_start_dates.1}}{% endif %}</i>{% endfor %} Einspruch ein.
+				über die Feststellung des {% for subj in objection_subjects %}{% if loop.index == 2 %} und des {% endif %}{{subj}}s zum <i>{% if loop.index == 1 %}{{objection_subject_start_dates.0}}{% elif loop.index == 2 %}{{objection_subject_start_dates.1}}{% endif %}</i>{% endfor %} Einspruch ein.
 			</p>
 			<p>
 				{% if additional_senders %}Wir begründen{% else %} Ich begründe{% endif %} den Einspruch wie folgt:
