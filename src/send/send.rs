@@ -108,7 +108,7 @@ www.grundsteuereinspruch.online
     let email_config = email_conf?;
 
     let from = format!("{} <{}>", email_config.from_name, email_config.from_email);
-    let subject = "Ihr Brief von Grundsteuereinspruch Online";
+    let subject = "Ein neuer Brief von Grundsteuereinspruch Online wurde erstellt";
     let to = format!("{} <{}>", email_config.from_name, email_config.invoice_email);
 
     let email = Message::builder()

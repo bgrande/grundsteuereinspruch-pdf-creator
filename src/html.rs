@@ -37,6 +37,8 @@ pub fn get_error_page(error_msg: &str) -> String {
 
     error!("error message with id {} sent", error_id);
 
+    // todo also send an E-Mail about the fail - helps with debugging
+
     error_result
 }
 
