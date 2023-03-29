@@ -468,7 +468,7 @@ pub async fn create_html(
                 .push("Grundsteuermessbetrag".to_string());
         }
         // this is Einspruch für Grundsteuerwertbescheid
-        if field.key == "question_w8Rgel" && !check_val.to_owned().is_empty() {
+        if field.key == "question_w8Rgel" && letter.objection_subjects.contains(&"Grundsteuerwert".to_string()) {
             let formatted_naive_date = match get_formatted_date_from_string(check_val.clone(), "%d.%m.%Y") {
                 Ok(value) => value,
                 _ => "01.01.2025".to_string()
@@ -479,7 +479,7 @@ pub async fn create_html(
                 .push(formatted_naive_date);
         }
         // this is Einspruch für Grundsteuermessbescheid
-        if field.key == "question_n0DgP9" && !check_val.to_owned().is_empty() {
+        if field.key == "question_n0DgP9" && letter.objection_subjects.contains(&"Grundsteuermessbetrag".to_string()) {
             let formatted_naive_date = match get_formatted_date_from_string(check_val.clone(), "%d.%m.%Y") {
                 Ok(value) => value,
                 _ => "01.01.2025".to_string()
@@ -712,7 +712,7 @@ pub async fn create_html(
         }
     }
 
-    let sleep_time = time::Duration::from_millis(1000);
+    let sleep_time = time::Duration::from_millis(1600);
     thread::sleep(sleep_time);
 
     let _pdf_creation_result = match create_pdf_by_id(base_path.clone()) {
