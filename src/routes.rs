@@ -500,19 +500,19 @@ pub async fn create_html(
                 .push(check_val.clone());
         }
 
-        if field.key == "question_3ENVAL_price" {
+        if field.key == "question_3ENVAL_price"  || field.key == "question_3XpoOP_price" {
             invoice.payment.price = current_value[0].clone();
         }
-        if field.key == "question_3ENVAL_currency" {
+        if field.key == "question_3ENVAL_currency"  || field.key == "question_3XpoOP_currency" {
             invoice.payment.currency = current_value[0].clone();
         }
-        if field.key == "question_3ENVAL_name" {
+        if field.key == "question_3ENVAL_name"  || field.key == "question_3XpoOP_name" {
             invoice.payment.name = current_value[0].clone();
         }
-        if field.key == "question_3ENVAL_email" {
+        if field.key == "question_3ENVAL_email" || field.key == "question_3XpoOP_email" {
             invoice.payment.email = current_value[0].clone();
         }
-        if field.key == "question_3ENVAL_link" {
+        if field.key == "question_3ENVAL_link"  || field.key == "question_3XpoOP_link" {
             invoice.payment.link = current_value[0].clone();
         }
 
