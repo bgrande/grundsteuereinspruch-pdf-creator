@@ -183,9 +183,9 @@ pub async fn create_html(
             link: "".to_string(),
         },
         invoice_objects: vec![
-            "Erstellung eines individuellen Einspruchsbriefes an Ihr Finanzamt       |       1,26 €".to_string(),
-            "                                                        MwSt. 19%       |       0,24 €".to_string(),
-            "                                                           Gesamt       |       1,50 €".to_string(),
+            "Erstellung eines individuellen Einspruchsbriefes an Ihr Finanzamt       |       2,52 €".to_string(),
+            "                                                        MwSt. 19%       |       0,48 €".to_string(),
+            "                                                           Gesamt       |       3,00 €".to_string(),
         ],
     };
     let mut index = Index {
@@ -320,7 +320,7 @@ pub async fn create_html(
         }
 
         if field.key == "question_wazO6q" {
-            let email_val = current_value[0].clone();
+            let email_val = current_value[0].clone().trim().to_string();
 
             letter.email = email_val.clone();
             invoice.email = email_val.clone();
