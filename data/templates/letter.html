@@ -62,6 +62,7 @@
 			<span class="sender_street">{{street}}</span> <span class="sender_street_number">{{number}}</span><br>
 			<span class="sender_zip">{{zip}}</span> <span class="sender_city">{{city}}</span><br>
 			<span class="sender_email">{{email}}</span>
+			{% if phone %}<br><span class="sender_phone">{{phone}}</span>{% endif %}
 		</p>
 	</header>
 	{% if sender_names %}

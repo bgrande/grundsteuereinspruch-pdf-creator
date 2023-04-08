@@ -1,3 +1,13 @@
+# Learning for standalone PDF Creator
+- Input must be dynamic -> based on either payload or template
+  - payload -> mapping to template keys
+  - template -> mapping to payload keys
+  - at best: both the same
+  - types should be deferred from payload (i.e. json) as well, difficult from template
+- What's the USP in the end?
+- Support PDF forms -> PDF conversion necessary -> is there a crate?
+
+
 # 1.0.0
 - split request handler functions into separate sub functions
 - ausländische Nutzer?
@@ -23,7 +33,7 @@
     - check if deadline date is correct
     - test different cases (multiple page, 10 senders, ...)
 - use proper status codes (i.e. 201 Created for API /html endpoint) -> https://www.codetinkerer.com/2015/12/04/choosing-an-http-status-code.html
-- use phone number in letter
++ use phone number in letter
 - allow Überweisung
   - Rechnung: per Vorkasse (vorab mailen! -> attachment!)
   - Neuer Fragebogen (Kopie) ohne payment mit Angabe von Bankdaten zur Vorabüberweisung und Hinweis auf Linkzusendung nach Eingang 
