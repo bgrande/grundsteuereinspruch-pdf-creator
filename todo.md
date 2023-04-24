@@ -6,6 +6,7 @@
   - types should be deferred from payload (i.e. json) as well, difficult from template
 - What's the USP in the end?
 - Support PDF forms -> PDF conversion necessary -> is there a crate?
+- see https://templatesgo.com/ as a possible route
 
 
 # 1.0.0
