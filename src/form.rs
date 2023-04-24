@@ -81,14 +81,19 @@ pub fn get_value_from_option(options: &Option<Vec<FormFieldOption>>, vec_val: Ve
     };
 
     let mut list: Vec<String> = vec![];
+    let count = vec_val.len();
 
     for value in vec_val {
         match options.iter().find(|&item| item.id == value) {
             Some(option) => {
-                // only add if we don't have the custom (Sonstiges) option
-                if option.id != "10b80582-5b19-4906-bdb7-c656ffc22ba9" {
-                    list.push(option.text.clone())
+                // Verfassungseinspruch
+                if option.id == "8d05d594-f5bd-4151-9d63-9d0505c7671e" && count > 1 {
+                    list.push(format!("Hilfsweise: {}", option.text.clone()));
+                } else if option.id != "10b80582-5b19-4906-bdb7-c656ffc22ba9" {
+                    // only add if we don't have the custom (Sonstiges) option
+                    list.push(option.text.clone());
                 }
+
             },
             None => (),
         };
