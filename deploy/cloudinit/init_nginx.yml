@@ -68,7 +68,7 @@ runcmd:
   - apt-get update && apt-get upgrade -y
   - add-apt-repository universe
   - apt-get update
-  - apt-get install -y lsb-release ca-certificates apt-transport-https software-properties-common libssl-dev
+  - apt-get install -y lsb-release ca-certificates apt-transport-https software-properties-common libssl-dev bzip2
   - add-apt-repository -y ppa:ondrej/nginx-mainline
   - apt-get install -y fail2ban
   - apt-get install -y certbot python3-certbot-nginx

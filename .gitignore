@@ -20,6 +20,7 @@ data/json/*
 /Cargo.lock
 
 # app
+backup
 build/*
 test/rust
 test/kunde-*
